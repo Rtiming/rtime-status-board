@@ -376,8 +376,12 @@ aggregates existing check failures, missing/stale agents, collector issues,
 service resource budget issues, config warnings, recent status volatility, and
 latest resource threshold breaches. Status volatility is computed from the
 existing SQLite status-transition table over the last 24h; three or more
-changes for the same node/project/service become a warning in Ops, without a
-new collector or background task. Resource thresholds are configured in
+changes for the same node/project/service become an Ops item. If the latest
+transition has already returned to `ok` or `maintenance`, the item is kept as
+`info` with `resolved=true`; otherwise it remains a warning. This preserves the
+status-change log without keeping recovered deploy/restart noise marked as a
+current degraded impact, and it adds no collector or background task. Resource
+thresholds are configured in
 `config/status-board.yaml` under `diagnostics.resource_thresholds`; the default
 profile is CPU `90%`, memory `90%`, root disk `85%`, GPU utilization `90%`,
 network RX/TX `50MiB/s`, and storage read/write `100MiB/s`. The diagnostics

@@ -440,7 +440,7 @@ if volatility.get("window_seconds", 0) <= 0:
 if volatility.get("change_threshold", 0) < 1:
     raise SystemExit(f"ops status volatility has invalid threshold: {volatility}")
 for subject in volatility.get("subjects") or []:
-    for key in ("kind", "subject_id", "label", "change_count", "status", "latest_to", "latest_at", "detail"):
+    for key in ("kind", "subject_id", "label", "change_count", "status", "severity", "resolved", "latest_to", "latest_at", "detail"):
         if key not in subject:
             raise SystemExit(f"ops status volatility subject missing {key}: {subject}")
 

@@ -817,6 +817,7 @@ func TestOpsDiagnosticBuildsProjectImpacts(t *testing.T) {
 				Label:       "B Service",
 				ChangeCount: statusVolatilityThreshold,
 				Status:      StatusDegraded,
+				Severity:    "warn",
 				LatestFrom:  StatusOK,
 				LatestTo:    StatusDegraded,
 				LatestAt:    now.Add(-2 * time.Minute),
@@ -844,6 +845,57 @@ func TestOpsDiagnosticBuildsProjectImpacts(t *testing.T) {
 	}
 	if len(ops.StatusVolatility.Subjects) != 1 || ops.StatusVolatility.Subjects[0].SubjectID != "svc-b" {
 		t.Fatalf("status volatility = %#v, want svc-b", ops.StatusVolatility)
+	}
+	if ops.StatusVolatility.Subjects[0].Resolved || ops.StatusVolatility.Subjects[0].Severity != "warn" {
+		t.Fatalf("status volatility subject = %#v, want unresolved warning", ops.StatusVolatility.Subjects[0])
+	}
+}
+
+func TestOpsDiagnosticResolvedStatusVolatilityIsInfo(t *testing.T) {
+	cfg := AppConfig{
+		App: AppMeta{Name: "test"},
+		Projects: []ProjectConfig{
+			{ID: "project-a", Name: "Project A", ServiceIDs: []string{"svc-a"}},
+		},
+		Services: []ServiceConfig{
+			{ID: "svc-a", Name: "Service A", NodeID: "node-a", ProjectID: "project-a"},
+		},
+	}
+	aggregator := NewAggregator(&cfg, nil, nil, 0)
+	now := time.Date(2026, 6, 10, 6, 15, 0, 0, time.UTC)
+	ops := aggregator.opsDiagnostic(now, nil, nil, MetricsDiagnostic{}, nil, StatusVolatilityDiagnostic{
+		WindowSeconds:   statusVolatilityWindow.Seconds(),
+		ChangeThreshold: statusVolatilityThreshold,
+		Subjects: []StatusVolatilitySubject{
+			{
+				Kind:        "service",
+				SubjectID:   "svc-a",
+				Label:       "Service A",
+				ChangeCount: statusVolatilityThreshold,
+				Resolved:    true,
+				Status:      StatusOK,
+				Severity:    "info",
+				LatestFrom:  StatusDegraded,
+				LatestTo:    StatusOK,
+				LatestAt:    now.Add(-time.Minute),
+				Detail:      "3 status changes in the last 24h; latest degraded -> ok",
+			},
+		},
+	})
+
+	if ops.Counts.Warn != 0 || ops.Counts.Info != 1 || len(ops.Issues) != 1 {
+		t.Fatalf("ops = %#v, want one info volatility issue and no warnings", ops)
+	}
+	issue := ops.Issues[0]
+	if issue.Severity != "info" || issue.Status != StatusOK || issue.ServiceID != "svc-a" {
+		t.Fatalf("issue = %#v, want resolved info service volatility", issue)
+	}
+	if len(ops.ProjectImpacts) != 1 {
+		t.Fatalf("project impacts = %#v, want one info impact", ops.ProjectImpacts)
+	}
+	impact := ops.ProjectImpacts[0]
+	if impact.ProjectID != "project-a" || impact.Status != StatusOK || impact.InfoCount != 1 || impact.WarnCount != 0 {
+		t.Fatalf("project impact = %#v, want ok info-only impact", impact)
 	}
 }
 

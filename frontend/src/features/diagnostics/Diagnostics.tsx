@@ -350,6 +350,8 @@ export function Diagnostics({
                     <th>{t.kind}</th>
                     <th>{t.target}</th>
                     <th>{t.statusChanges}</th>
+                    <th>{t.severity}</th>
+                    <th>{t.resolved}</th>
                     <th>{t.transition}</th>
                     <th>{t.updated}</th>
                     <th>{t.detail}</th>
@@ -367,6 +369,8 @@ export function Diagnostics({
                         <strong>{formatCount(subject.change_count)}</strong>
                         <StatusPill status={subject.status} lang={lang} />
                       </td>
+                      <td>{subject.severity || '-'}</td>
+                      <td>{subject.resolved ? statusLabel[lang].ok : '-'}</td>
                       <td>
                         <div className="event-transition">
                           {subject.latest_from ? <StatusPill status={subject.latest_from} lang={lang} /> : <span>-</span>}

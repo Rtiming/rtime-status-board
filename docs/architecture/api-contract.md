@@ -239,7 +239,10 @@ service resource budget issues, config warnings/errors, recent API request
 health issues, recent status volatility, and latest node/GPU threshold checks.
 Status volatility is calculated from existing SQLite status-transition events
 over the last 24h; subjects with at least three changes are promoted as
-`status-volatility` warnings and also appear in `status_volatility.subjects`.
+`status-volatility` Ops items and also appear in `status_volatility.subjects`.
+Recovered subjects whose latest transition returned to `ok` or `maintenance`
+are marked `resolved=true`, use `severity=info`, and no longer make the related
+project impact degraded. Unresolved volatile subjects remain warnings.
 It returns `issues`, `counts.error/warn/info`, and
 `resource_thresholds` with the effective per-node CPU, memory, root disk, GPU
 utilization, network RX/TX rate, and storage read/write rate limits used for

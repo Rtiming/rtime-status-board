@@ -594,6 +594,8 @@ export interface StatusVolatilitySubject {
   label: string;
   change_count: number;
   status: Status;
+  severity: string;
+  resolved: boolean;
   latest_from?: Status;
   latest_to: Status;
   latest_detail: string;

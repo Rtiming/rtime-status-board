@@ -665,6 +665,8 @@ type StatusVolatilitySubject struct {
 	Label        string    `json:"label"`
 	ChangeCount  int       `json:"change_count"`
 	Status       Status    `json:"status"`
+	Severity     string    `json:"severity"`
+	Resolved     bool      `json:"resolved"`
 	LatestFrom   Status    `json:"latest_from,omitempty"`
 	LatestTo     Status    `json:"latest_to"`
 	LatestDetail string    `json:"latest_detail"`

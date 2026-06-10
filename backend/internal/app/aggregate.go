@@ -1091,10 +1091,15 @@ func (a *Aggregator) statusVolatilityDiagnostic(ctx context.Context, now time.Ti
 	}
 	for i := range subjects {
 		subject := &subjects[i]
-		if subject.ChangeCount >= statusVolatilityThreshold {
+		subject.Resolved = subject.LatestTo == StatusOK || subject.LatestTo == StatusMaintenance
+		subject.Severity = "info"
+		if subject.ChangeCount >= statusVolatilityThreshold && !subject.Resolved {
 			subject.Status = StatusDegraded
 		} else {
 			subject.Status = StatusOK
+		}
+		if subject.ChangeCount >= statusVolatilityThreshold && !subject.Resolved {
+			subject.Severity = "warn"
 		}
 		subject.Detail = fmt.Sprintf("%d status changes in the last %.0fh; latest %s -> %s", subject.ChangeCount, statusVolatilityWindow.Hours(), nonEmpty(string(subject.LatestFrom), "-"), nonEmpty(string(subject.LatestTo), "-"))
 	}
@@ -1204,8 +1209,15 @@ func (a *Aggregator) opsDiagnostic(now time.Time, services []ServiceView, metric
 		if subject.ChangeCount < volatility.ChangeThreshold {
 			continue
 		}
+		severity := subject.Severity
+		if severity == "" {
+			severity = "warn"
+			if subject.Resolved {
+				severity = "info"
+			}
+		}
 		issue := OpsIssue{
-			Severity:    "warn",
+			Severity:    severity,
 			Kind:        "status-volatility",
 			SubjectID:   subject.SubjectID,
 			SubjectName: subject.Label,
@@ -1354,7 +1366,7 @@ func (a *Aggregator) projectImpacts(issues []OpsIssue) []OpsProjectImpact {
 		row.Status = StatusOK
 		if row.ErrorCount > 0 {
 			row.Status = StatusDown
-		} else if row.WarnCount > 0 || row.InfoCount > 0 {
+		} else if row.WarnCount > 0 {
 			row.Status = StatusDegraded
 		}
 		row.Detail = fmt.Sprintf("%d issues across %d kinds", row.IssueCount, len(row.IssueKinds))

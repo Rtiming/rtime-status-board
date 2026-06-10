@@ -152,7 +152,10 @@ Current implementation status:
 - The ops digest now includes status-volatility diagnostics from existing
   SQLite status-change events. The first version uses a fixed 24h window and a
   threshold of three changes per node/project/service, adding only one bounded
-  indexed read to the Diagnostics request.
+  indexed read to the Diagnostics request. Resolved volatility whose latest
+  status is back to `ok` or `maintenance` is kept as `info` with
+  `resolved=true`, so recovered deploy/restart churn remains visible without
+  making project impact rows look currently degraded.
 - Diagnostics now includes deployment-boundary checks for the board runtime
   itself: production mode, reserved localhost ports, Gatus URL, config/data/
   frontend paths, frontend artifact readability, cache TTL, retention, SQLite
