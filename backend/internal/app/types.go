@@ -195,6 +195,7 @@ type ServiceCheckHistoryResponse struct {
 	Service     ServiceView          `json:"service"`
 	EndpointKey string               `json:"endpoint_key"`
 	Window      string               `json:"window"`
+	Summary     CheckHistorySummary  `json:"summary"`
 	Results     []ServiceCheckResult `json:"results"`
 	Returned    int                  `json:"returned"`
 }
@@ -204,17 +205,30 @@ type ProjectCheckHistoryResponse struct {
 	Project       ProjectView          `json:"project"`
 	Window        string               `json:"window"`
 	EndpointCount int                  `json:"endpoint_count"`
+	Summary       CheckHistorySummary  `json:"summary"`
 	Results       []ProjectCheckResult `json:"results"`
 	Returned      int                  `json:"returned"`
 }
 
 type NodeCheckHistoryResponse struct {
-	GeneratedAt   time.Time         `json:"generated_at"`
-	Node          NodeView          `json:"node"`
-	Window        string            `json:"window"`
-	EndpointCount int               `json:"endpoint_count"`
-	Results       []NodeCheckResult `json:"results"`
-	Returned      int               `json:"returned"`
+	GeneratedAt   time.Time           `json:"generated_at"`
+	Node          NodeView            `json:"node"`
+	Window        string              `json:"window"`
+	EndpointCount int                 `json:"endpoint_count"`
+	Summary       CheckHistorySummary `json:"summary"`
+	Results       []NodeCheckResult   `json:"results"`
+	Returned      int                 `json:"returned"`
+}
+
+type CheckHistorySummary struct {
+	Total             int        `json:"total"`
+	Successes         int        `json:"successes"`
+	Failures          int        `json:"failures"`
+	FailurePercent    float64    `json:"failure_percent"`
+	AvgResponseTimeMS float64    `json:"avg_response_time_ms"`
+	P95ResponseTimeMS int64      `json:"p95_response_time_ms"`
+	MaxResponseTimeMS int64      `json:"max_response_time_ms"`
+	LastFailureAt     *time.Time `json:"last_failure_at,omitempty"`
 }
 
 type ServiceCheckResult struct {

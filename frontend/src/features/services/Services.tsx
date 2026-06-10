@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Activity, Clock, Layers3, Server, TriangleAlert } from 'lucide-react';
 import { fetchServiceChecks, fetchServiceDetail } from '../../api';
 import { Metric, MetricSummaryCard, Row, SubPanel } from '../../shared/components';
-import { formatTime } from '../../shared/format';
+import { formatLatencyMS, formatTime } from '../../shared/format';
 import { dictionary, type Lang } from '../../shared/i18n';
 import { StatusDot, StatusPill, statusLabel } from '../../shared/status';
 import type { ServiceCheckHistoryResponse, ServiceDetailResponse, ServiceView } from '../../types';
@@ -184,6 +184,18 @@ function ServiceDetailPanel({ detail, lang }: { detail: ServiceDetailResponse; l
       </div>
 
       <SubPanel title={t.checkHistory}>
+        <div className="diag-kv compact-kv project-history-meta check-history-meta">
+          <span>{t.checks}</span>
+          <strong>{checks?.returned ?? 0}</strong>
+          <span>{t.recentFailures}</span>
+          <strong>{checks?.summary?.failures ?? 0}</strong>
+          <span>{t.avgLatency}</span>
+          <strong>{formatLatencyMS(checks?.summary?.avg_response_time_ms)}</strong>
+          <span>{t.p95Latency}</span>
+          <strong>{formatLatencyMS(checks?.summary?.p95_response_time_ms)}</strong>
+          <span>{t.lastFailure}</span>
+          <strong>{formatTime(checks?.summary?.last_failure_at)}</strong>
+        </div>
         {checksError && (
           <div className="notice inline-notice">
             <TriangleAlert size={18} />

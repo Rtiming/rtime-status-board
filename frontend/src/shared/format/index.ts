@@ -102,6 +102,11 @@ export function formatSeconds(value: number) {
   return `${value.toFixed(1)}s`;
 }
 
+export function formatLatencyMS(value: number | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return '-';
+  return `${value.toFixed(value >= 10 ? 0 : 1)}ms`;
+}
+
 export function formatCount(value: number) {
   if (!Number.isFinite(value)) return '-';
   return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(value);

@@ -291,6 +291,15 @@ def get(path):
     with urllib.request.urlopen(API + path, timeout=10) as resp:
         return json.load(resp)
 
+def check_history_summary(scope, subject_id, checks):
+    summary = checks.get("summary") or {}
+    returned = checks.get("returned", 0)
+    if summary.get("total") != returned:
+        raise SystemExit(f"{scope} checks summary total mismatch for {subject_id}: {summary} returned={returned}")
+    for key in ("successes", "failures", "failure_percent", "avg_response_time_ms", "p95_response_time_ms", "max_response_time_ms"):
+        if key not in summary:
+            raise SystemExit(f"{scope} checks summary missing {key} for {subject_id}: {summary}")
+
 diagnostics = get("/api/v1/diagnostics")
 metrics = get("/api/v1/metrics")
 schema = get("/api/v1/telemetry/schema")
@@ -383,6 +392,7 @@ for node in nodes:
     checks = get(path)
     if "results" not in checks:
         raise SystemExit(f"node checks missing results for {node_id}")
+    check_history_summary("node", node_id, checks)
     print(f"  node {node_id}: {checks.get('returned', 0)} latest check rows")
 
 for project in projects:
@@ -393,6 +403,7 @@ for project in projects:
     checks = get(path)
     if "results" not in checks:
         raise SystemExit(f"project checks missing results for {project_id}")
+    check_history_summary("project", project_id, checks)
     print(f"  project {project_id}: {checks.get('returned', 0)} latest check rows")
 
 service_samples = [service for service in services if service.get("endpoint_key")][:5]
@@ -402,6 +413,7 @@ for service in service_samples:
     checks = get(path)
     if "results" not in checks:
         raise SystemExit(f"service checks missing results for {service_id}")
+    check_history_summary("service", service_id, checks)
     print(f"  service {service_id}: {checks.get('returned', 0)} latest check rows")
 PY
 

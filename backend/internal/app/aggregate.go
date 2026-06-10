@@ -233,6 +233,7 @@ func (a *Aggregator) ProjectChecks(ctx context.Context, projectID string, window
 		Project:       project,
 		Window:        window.String(),
 		EndpointCount: endpointCount,
+		Summary:       summarizeCheckHistory(results, func(result ProjectCheckResult) bool { return result.Success }, func(result ProjectCheckResult) time.Time { return result.Timestamp }, func(result ProjectCheckResult) int64 { return result.ResponseTimeMS }),
 		Results:       results,
 		Returned:      len(results),
 	}, nil
@@ -314,6 +315,7 @@ func (a *Aggregator) NodeChecks(ctx context.Context, nodeID string, window time.
 		Node:          node,
 		Window:        window.String(),
 		EndpointCount: endpointCount,
+		Summary:       summarizeCheckHistory(results, func(result NodeCheckResult) bool { return result.Success }, func(result NodeCheckResult) time.Time { return result.Timestamp }, func(result NodeCheckResult) int64 { return result.ResponseTimeMS }),
 		Results:       results,
 		Returned:      len(results),
 	}, nil
@@ -341,6 +343,7 @@ func (a *Aggregator) ServiceChecks(ctx context.Context, serviceID string, window
 			GeneratedAt: summary.GeneratedAt,
 			Service:     service,
 			Window:      window.String(),
+			Summary:     CheckHistorySummary{},
 			Results:     []ServiceCheckResult{},
 		}, nil
 	}
@@ -373,9 +376,52 @@ func (a *Aggregator) ServiceChecks(ctx context.Context, serviceID string, window
 		Service:     service,
 		EndpointKey: service.EndpointKey,
 		Window:      window.String(),
+		Summary:     summarizeCheckHistory(filtered, func(result ServiceCheckResult) bool { return result.Success }, func(result ServiceCheckResult) time.Time { return result.Timestamp }, func(result ServiceCheckResult) int64 { return result.ResponseTimeMS }),
 		Results:     filtered,
 		Returned:    len(filtered),
 	}, nil
+}
+
+func summarizeCheckHistory[T any](results []T, success func(T) bool, timestamp func(T) time.Time, responseTimeMS func(T) int64) CheckHistorySummary {
+	summary := CheckHistorySummary{Total: len(results)}
+	if len(results) == 0 {
+		return summary
+	}
+	latencies := make([]int64, 0, len(results))
+	var totalLatency int64
+	for _, result := range results {
+		if success(result) {
+			summary.Successes++
+		} else {
+			summary.Failures++
+			ts := timestamp(result)
+			if !ts.IsZero() && (summary.LastFailureAt == nil || ts.After(*summary.LastFailureAt)) {
+				copy := ts
+				summary.LastFailureAt = &copy
+			}
+		}
+		latency := responseTimeMS(result)
+		if latency < 0 {
+			latency = 0
+		}
+		latencies = append(latencies, latency)
+		totalLatency += latency
+		if latency > summary.MaxResponseTimeMS {
+			summary.MaxResponseTimeMS = latency
+		}
+	}
+	summary.FailurePercent = float64(summary.Failures) / float64(summary.Total) * 100
+	summary.AvgResponseTimeMS = float64(totalLatency) / float64(len(latencies))
+	sort.Slice(latencies, func(i, j int) bool { return latencies[i] < latencies[j] })
+	p95Index := int(math.Ceil(float64(len(latencies))*0.95)) - 1
+	if p95Index < 0 {
+		p95Index = 0
+	}
+	if p95Index >= len(latencies) {
+		p95Index = len(latencies) - 1
+	}
+	summary.P95ResponseTimeMS = latencies[p95Index]
+	return summary
 }
 
 func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, error) {
@@ -1400,10 +1446,10 @@ func publicDomainDNSCheck(domain string, expectedIP string, lookup func(context.
 	}
 	check.Status = StatusDegraded
 	if containsFakeIP(unique) {
-			check.Detail = "public domain resolved to a local proxy fake-IP range instead of the expected public IP"
-		} else {
-			check.Detail = "public domain does not resolve to the expected public IP"
-		}
+		check.Detail = "public domain resolved to a local proxy fake-IP range instead of the expected public IP"
+	} else {
+		check.Detail = "public domain does not resolve to the expected public IP"
+	}
 	return check
 }
 

@@ -179,6 +179,11 @@ Current implementation status:
   another collector or polling loop.
 - Service detail is implemented, including latest service context and bounded
   Gatus check history for a selected service.
+- Node, project, and service check-log responses now include a bounded summary
+  derived from the returned rows: success/failure counts, failure percentage,
+  average latency, p95 latency, max latency, and latest failure time. This gives
+  drill-down pages faster triage context without another collector, writer, or
+  long-retention history table.
 
 Chart windows:
 

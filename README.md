@@ -228,6 +228,9 @@ domain.
 failure counts, failed conditions, and raw error messages. `/api/v1/diagnostics`
 is the reserved debug surface for future tuning: provider health, static config
 mapping issues, metrics agent freshness, failing services, and raw checks.
+Node, project, and service check-log APIs also return a `summary` object over
+the bounded rows, including failure counts, failure percentage, average/p95/max
+latency, and latest failure time.
 
 Future detail and chart APIs are documented in `docs/architecture/api-contract.md`.
 `/api/v1/nodes/:id` returns a lightweight node detail view assembled from

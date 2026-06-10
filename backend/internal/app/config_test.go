@@ -197,17 +197,17 @@ func TestPublicDomainDNSCheck(t *testing.T) {
 		wantStatus Status
 		wantDetail string
 	}{
-			{
-				name:       "expected public ip",
-				ips:        []string{"203.0.113.10"},
-				wantStatus: StatusOK,
-				wantDetail: "public domain resolves to the expected public IP",
-			},
+		{
+			name:       "expected public ip",
+			ips:        []string{"203.0.113.10"},
+			wantStatus: StatusOK,
+			wantDetail: "public domain resolves to the expected public IP",
+		},
 		{
 			name:       "fake ip warning",
 			ips:        []string{"198.18.0.136"},
 			wantStatus: StatusDegraded,
-				wantDetail: "public domain resolved to a local proxy fake-IP range instead of the expected public IP",
+			wantDetail: "public domain resolved to a local proxy fake-IP range instead of the expected public IP",
 		},
 		{
 			name:       "lookup error",
@@ -218,7 +218,7 @@ func TestPublicDomainDNSCheck(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-				check := publicDomainDNSCheck("status.example.com", "203.0.113.10", func(context.Context, string) ([]string, error) {
+			check := publicDomainDNSCheck("status.example.com", "203.0.113.10", func(context.Context, string) ([]string, error) {
 				return tc.ips, tc.err
 			})
 			if check.Status != tc.wantStatus || check.Detail != tc.wantDetail {
@@ -235,9 +235,9 @@ func TestPublicIPEntryCheck(t *testing.T) {
 		wantStatus Status
 		wantDetail string
 	}{
-			{
-				name:       "valid public ip",
-				publicIP:   "203.0.113.10",
+		{
+			name:       "valid public ip",
+			publicIP:   "203.0.113.10",
 			wantStatus: StatusOK,
 			wantDetail: "public IP entry is configured; verify-sh-core checks that unauthenticated access returns 401",
 		},
@@ -247,9 +247,9 @@ func TestPublicIPEntryCheck(t *testing.T) {
 			wantStatus: StatusDegraded,
 			wantDetail: "expected public IP is not configured",
 		},
-			{
-				name:       "invalid public ip",
-				publicIP:   "status.example.com",
+		{
+			name:       "invalid public ip",
+			publicIP:   "status.example.com",
 			wantStatus: StatusDegraded,
 			wantDetail: "expected public IP is not a valid IP address",
 		},
@@ -1531,6 +1531,11 @@ func TestProjectChecksEndpointAggregatesRelatedServiceResults(t *testing.T) {
 	if response.Project.ID != "project-a" || response.EndpointCount != 2 || response.Returned != 2 {
 		t.Fatalf("response = %#v, want project-a with two endpoints and two returned rows", response)
 	}
+	if response.Summary.Total != 2 || response.Summary.Successes != 1 || response.Summary.Failures != 1 ||
+		response.Summary.AvgResponseTimeMS != 17.5 || response.Summary.P95ResponseTimeMS != 20 || response.Summary.MaxResponseTimeMS != 20 ||
+		response.Summary.LastFailureAt == nil || !response.Summary.LastFailureAt.Equal(base.Add(time.Minute)) {
+		t.Fatalf("summary = %#v, want one failure and latency stats from bounded project results", response.Summary)
+	}
 	if response.Results[0].ServiceID != "svc-direct" || response.Results[0].Status != StatusOK {
 		t.Fatalf("first result = %#v, want newest direct service healthy", response.Results[0])
 	}
@@ -1623,6 +1628,11 @@ func TestNodeChecksEndpointAggregatesNodeServiceResults(t *testing.T) {
 	if response.Node.ID != "node-a" || response.EndpointCount != 2 || response.Returned != 2 {
 		t.Fatalf("response = %#v, want node-a with two endpoints and two returned rows", response)
 	}
+	if response.Summary.Total != 2 || response.Summary.Successes != 1 || response.Summary.Failures != 1 ||
+		response.Summary.AvgResponseTimeMS != 17.5 || response.Summary.P95ResponseTimeMS != 20 || response.Summary.MaxResponseTimeMS != 20 ||
+		response.Summary.LastFailureAt == nil || !response.Summary.LastFailureAt.Equal(base.Add(time.Minute)) {
+		t.Fatalf("summary = %#v, want one failure and latency stats from bounded node results", response.Summary)
+	}
 	if response.Results[0].ServiceID != "svc-a2" || response.Results[0].Status != StatusOK {
 		t.Fatalf("first result = %#v, want newest node-a worker healthy", response.Results[0])
 	}
@@ -1633,6 +1643,72 @@ func TestNodeChecksEndpointAggregatesNodeServiceResults(t *testing.T) {
 		if result.ServiceID == "svc-b" {
 			t.Fatalf("unrelated node service leaked into node checks: %#v", response.Results)
 		}
+	}
+}
+
+func TestServiceChecksEndpointReturnsSummary(t *testing.T) {
+	store, err := OpenStore(filepath.Join(t.TempDir(), "status-board.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	base := time.Now().UTC().Add(-10 * time.Minute).Truncate(time.Second)
+	gatus := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/api/v1/endpoints/statuses" {
+			t.Fatalf("path = %s, want /api/v1/endpoints/statuses", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(fmt.Sprintf(`[
+			{
+				"name": "service-a",
+				"group": "node-a",
+				"key": "svc_a_endpoint",
+				"results": [
+					{"duration": 10000000, "success": true, "timestamp": %q},
+					{"duration": 20000000, "success": false, "errors": ["timeout"], "timestamp": %q},
+					{"duration": 30000000, "success": true, "timestamp": %q}
+				]
+			}
+		]`,
+			base.Format(time.RFC3339Nano),
+			base.Add(time.Minute).Format(time.RFC3339Nano),
+			base.Add(2*time.Minute).Format(time.RFC3339Nano),
+		)))
+	}))
+	defer gatus.Close()
+
+	cfg := AppConfig{
+		App:      AppMeta{Name: "test"},
+		Nodes:    []NodeConfig{{ID: "node-a", Name: "node-a"}},
+		Projects: []ProjectConfig{{ID: "project-a", Name: "Project A", ServiceIDs: []string{"svc-a"}}},
+		Services: []ServiceConfig{{ID: "svc-a", Name: "Service A", NodeID: "node-a", ProjectID: "project-a", EndpointKey: "svc_a_endpoint"}},
+	}
+	aggregator := NewAggregator(&cfg, store, NewGatusClient(gatus.URL), time.Hour)
+	server := NewServer(ServerOptions{Config: &cfg, Store: store, Aggregator: aggregator})
+	request := httptest.NewRequest(http.MethodGet, "/api/v1/services/svc-a/checks?window=24h&limit=3", nil)
+	recorder := httptest.NewRecorder()
+	server.Router().ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, body = %s", recorder.Code, recorder.Body.String())
+	}
+	var response ServiceCheckHistoryResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if response.Service.ID != "svc-a" || response.EndpointKey != "svc_a_endpoint" || response.Returned != 3 {
+		t.Fatalf("response = %#v, want service-a with three returned rows", response)
+	}
+	if response.Summary.Total != 3 || response.Summary.Successes != 2 || response.Summary.Failures != 1 ||
+		response.Summary.AvgResponseTimeMS != 20 || response.Summary.P95ResponseTimeMS != 30 || response.Summary.MaxResponseTimeMS != 30 ||
+		response.Summary.LastFailureAt == nil || !response.Summary.LastFailureAt.Equal(base.Add(time.Minute)) {
+		t.Fatalf("summary = %#v, want one failure and latency stats from service results", response.Summary)
+	}
+	if response.Results[0].Status != StatusOK || response.Results[0].ResponseTimeMS != 30 {
+		t.Fatalf("first result = %#v, want newest healthy row", response.Results[0])
+	}
+	if response.Results[1].Status != StatusDown || response.Results[1].Detail != "timeout" {
+		t.Fatalf("second result = %#v, want failure row", response.Results[1])
 	}
 }
 

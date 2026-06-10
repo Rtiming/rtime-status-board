@@ -457,6 +457,10 @@ td span,
   margin: 0;
 }
 
+.check-history-meta {
+  margin-bottom: 12px;
+}
+
 .range-control {
   display: inline-flex;
   gap: 4px;

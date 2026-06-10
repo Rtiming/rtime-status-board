@@ -127,6 +127,7 @@ export interface ServiceCheckHistoryResponse {
   service: ServiceView;
   endpoint_key: string;
   window: string;
+  summary: CheckHistorySummary;
   results: ServiceCheckResult[];
   returned: number;
 }
@@ -136,6 +137,7 @@ export interface ProjectCheckHistoryResponse {
   project: ProjectView;
   window: string;
   endpoint_count: number;
+  summary: CheckHistorySummary;
   results: ProjectCheckResult[];
   returned: number;
 }
@@ -145,8 +147,20 @@ export interface NodeCheckHistoryResponse {
   node: NodeView;
   window: string;
   endpoint_count: number;
+  summary: CheckHistorySummary;
   results: NodeCheckResult[];
   returned: number;
+}
+
+export interface CheckHistorySummary {
+  total: number;
+  successes: number;
+  failures: number;
+  failure_percent: number;
+  avg_response_time_ms: number;
+  p95_response_time_ms: number;
+  max_response_time_ms: number;
+  last_failure_at?: string;
 }
 
 export interface ServiceCheckResult {

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Activity, Clock, Gauge, ListChecks, Server, Signal, TriangleAlert } from 'lucide-react';
 import { fetchMetricReportLogs, fetchProjectChecks, fetchProjectDetail, fetchProjectMetricsHistory } from '../../api';
 import { AgentReportRow, DetailResourceStatesPanel, HistoryChart, Metric, MetricSummaryCard, Row, SubPanel } from '../../shared/components';
-import { formatIOPS, formatRate, formatSeconds, formatTime } from '../../shared/format';
+import { formatIOPS, formatLatencyMS, formatRate, formatSeconds, formatTime } from '../../shared/format';
 import { dictionary, type Lang } from '../../shared/i18n';
 import { initialMetricRange, metricRanges, type MetricRange } from '../../shared/ranges';
 import { StatusDot, StatusPill, statusLabel } from '../../shared/status';
@@ -400,7 +400,8 @@ function ProjectCheckHistoryPanel({
 }) {
   const t = dictionary[lang];
   const results = checks?.results ?? [];
-  const failedCount = results.filter((result) => !result.success).length;
+  const summary = checks?.summary;
+  const failedCount = summary?.failures ?? results.filter((result) => !result.success).length;
   return (
     <SubPanel title={t.projectCheckHistory}>
       <div className="detail-head subpanel-head">
@@ -411,6 +412,12 @@ function ProjectCheckHistoryPanel({
           <strong>{checks?.endpoint_count ?? 0}</strong>
           <span>{t.recentFailures}</span>
           <strong>{failedCount}</strong>
+          <span>{t.avgLatency}</span>
+          <strong>{formatLatencyMS(summary?.avg_response_time_ms)}</strong>
+          <span>{t.p95Latency}</span>
+          <strong>{formatLatencyMS(summary?.p95_response_time_ms)}</strong>
+          <span>{t.lastFailure}</span>
+          <strong>{formatTime(summary?.last_failure_at)}</strong>
         </div>
         <div className="range-control" aria-label={t.range}>
           {metricRanges.map((item) => (

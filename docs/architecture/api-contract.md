@@ -52,7 +52,10 @@ It resolves related services through both `project.service_ids` and
 `service.project_id`, then performs one on-demand Gatus recent-results read and
 returns a bounded, newest-first log with service, node, endpoint, error, failed
 condition, latency, and timestamp fields. It does not persist anything, does not
-add a writer, and defaults to `24h` / `60`, capped at `200`.
+add a writer, and defaults to `24h` / `60`, capped at `200`. The response also
+includes a `summary` object derived from the returned rows: total, successes,
+failures, failure percent, average response time, p95 response time, max
+response time, and latest failure time.
 
 `GET /api/v1/projects/:id/metrics` is also cheap. It resolves project-related
 services through both `project.service_ids` and `service.project_id`, maps those
@@ -75,6 +78,7 @@ filters the node's mapped services, performs one on-demand Gatus recent-results
 read, and returns a bounded, newest-first log with service, project, endpoint,
 error, failed condition, latency, and timestamp fields. It does not persist
 anything, does not add a writer, and defaults to `24h` / `60`, capped at `200`.
+It returns the same bounded-row `summary` shape as project checks.
 
 `GET /api/v1/services/:id` is also intentionally cheap. It reuses the summary
 cache and recent SQLite events, returning the service, its node, project, latest
@@ -83,7 +87,8 @@ node metrics, a latest-check summary, and service/node/project events.
 `GET /api/v1/services/:id/checks` returns a bounded list derived from Gatus
 recent endpoint results. It supports `window` and `limit`, defaults to
 `24h` / `30`, and caps `limit` at `100`. This gives service-level debugging
-detail without adding another writer or polling loop.
+detail without adding another writer or polling loop. It returns the same
+bounded-row `summary` shape as node and project checks.
 
 The `schema` endpoint should tell the frontend which domains exist per node:
 CPU, memory, disk, network, IO, GPU, containers, and processes.
@@ -147,7 +152,8 @@ commands, read Docker sockets, or start a collector. The external
 run inside the app process, including Docker container resource budgets, Nginx
 Basic Auth route checks, production directory hygiene, full node/project/service
 detail API smoke, and bounded check-log smoke for node, project, and service
-drill-down paths.
+drill-down paths. The bounded check-log smoke also verifies the returned
+`summary` object for each sampled path.
 
 `/api/v1/diagnostics.projects` exposes a low-load project coverage matrix. Each
 row includes project ID/name/status/detail, service and critical-service counts,

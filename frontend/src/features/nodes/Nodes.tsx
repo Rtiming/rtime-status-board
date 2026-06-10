@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Clock, Gauge, Layers3, ListChecks, TriangleAlert } from 'lucide-react';
 import { fetchMetricReportLogs, fetchNodeChecks, fetchNodeDetail } from '../../api';
 import { AgentReportRow, DetailResourceStatesPanel, Metric, MetricSummaryCard, Row, SubPanel } from '../../shared/components';
-import { formatSeconds, formatTime } from '../../shared/format';
+import { formatLatencyMS, formatSeconds, formatTime } from '../../shared/format';
 import { dictionary, type Lang } from '../../shared/i18n';
 import { metricRanges, type MetricRange } from '../../shared/ranges';
 import { StatusDot, StatusPill, statusLabel } from '../../shared/status';
@@ -296,7 +296,8 @@ function NodeCheckHistoryPanel({
 }) {
   const t = dictionary[lang];
   const results = checks?.results ?? [];
-  const failedCount = results.filter((result) => !result.success).length;
+  const summary = checks?.summary;
+  const failedCount = summary?.failures ?? results.filter((result) => !result.success).length;
   return (
     <SubPanel title={t.nodeCheckHistory}>
       <div className="detail-head subpanel-head">
@@ -307,6 +308,12 @@ function NodeCheckHistoryPanel({
           <strong>{checks?.endpoint_count ?? 0}</strong>
           <span>{t.recentFailures}</span>
           <strong>{failedCount}</strong>
+          <span>{t.avgLatency}</span>
+          <strong>{formatLatencyMS(summary?.avg_response_time_ms)}</strong>
+          <span>{t.p95Latency}</span>
+          <strong>{formatLatencyMS(summary?.p95_response_time_ms)}</strong>
+          <span>{t.lastFailure}</span>
+          <strong>{formatTime(summary?.last_failure_at)}</strong>
         </div>
         <div className="range-control" aria-label={t.range}>
           {metricRanges.map((item) => (
