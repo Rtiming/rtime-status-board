@@ -460,6 +460,11 @@ resource_budget:
   max_cpu_percent: 50
 ```
 
+The production config also budgets the board's own `statusd` and `gatus`
+containers under `sh-core-status-board-api`, so the UI and Ops digest can catch
+status-board resource growth before it only appears in external verification
+logs.
+
 Node-level resource thresholds for the ops digest are configured separately:
 
 ```yaml

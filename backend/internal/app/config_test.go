@@ -31,14 +31,20 @@ func TestLoadConfig(t *testing.T) {
 		t.Fatalf("expected projects")
 	}
 	khoj := ServiceConfig{}
+	statusBoard := ServiceConfig{}
 	for _, service := range cfg.Services {
-		if service.ID == "orangepi-khoj" {
+		switch service.ID {
+		case "orangepi-khoj":
 			khoj = service
-			break
+		case "sh-core-status-board-api":
+			statusBoard = service
 		}
 	}
 	if khoj.ResourceBudget == nil || len(khoj.ResourceBudget.ContainerNames) != 2 || khoj.ResourceBudget.MaxMemoryMiB != 1536 {
 		t.Fatalf("orangepi-khoj resource budget = %#v, want two containers and 1536MiB", khoj.ResourceBudget)
+	}
+	if statusBoard.ResourceBudget == nil || len(statusBoard.ResourceBudget.ContainerNames) != 2 || statusBoard.ResourceBudget.ComposeProject != "rtime-status-board" || statusBoard.ResourceBudget.MaxMemoryMiB != 160 || statusBoard.ResourceBudget.MaxCPUPercent != 50 {
+		t.Fatalf("sh-core-status-board-api resource budget = %#v, want status-board container budget", statusBoard.ResourceBudget)
 	}
 	thresholds := cfg.Diagnostics.ResourceThresholds.EffectiveForNode("srv03")
 	if thresholds.CPUPercent != 90 || thresholds.MemoryPercent != 90 || thresholds.RootDiskPercent != 85 || thresholds.GPUUtilPercent != 90 ||
@@ -46,6 +52,26 @@ func TestLoadConfig(t *testing.T) {
 		thresholds.StorageReadBps != 104857600 || thresholds.StorageWriteBps != 104857600 {
 		t.Fatalf("resource thresholds = %#v, want default YAML values", thresholds)
 	}
+}
+
+func TestExampleConfigIncludesStatusBoardResourceBudget(t *testing.T) {
+	cfg, err := LoadConfig("../../../config/status-board.example.yaml")
+	if err != nil {
+		t.Fatalf("load example config: %v", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		t.Fatalf("validate example config: %v", err)
+	}
+	for _, service := range cfg.Services {
+		if service.ID != "core-status-board-api" {
+			continue
+		}
+		if service.ResourceBudget == nil || service.ResourceBudget.ComposeProject != "rtime-status-board" || service.ResourceBudget.MaxMemoryMiB != 160 || service.ResourceBudget.MaxCPUPercent != 50 {
+			t.Fatalf("core-status-board-api resource budget = %#v, want status-board container budget", service.ResourceBudget)
+		}
+		return
+	}
+	t.Fatalf("core-status-board-api not found")
 }
 
 func TestAggregateOverall(t *testing.T) {

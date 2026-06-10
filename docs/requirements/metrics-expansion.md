@@ -116,7 +116,9 @@ Current implementation status:
 - Diagnostics now evaluates optional service resource budgets from static
   config against latest Docker container snapshots. This keeps heavy services
   such as Khoj visible without adding a new collector or long-retention metrics
-  store.
+  store. The production config also budgets the status board's own `statusd`
+  and `gatus` containers under `sh-core-status-board-api`, so self-load is
+  visible from the board rather than only from the deployment verifier.
 - Diagnostics now includes status-board runtime and SQLite store statistics
   so deployment resource growth can be checked without opening shell logs or
   adding another process.

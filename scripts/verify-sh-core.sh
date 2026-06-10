@@ -443,6 +443,7 @@ missing = metric_diag.get("missing_nodes") or []
 stale = metric_diag.get("stale_nodes") or []
 collector_issues = metric_diag.get("collector_issues") or []
 collector_summary = metric_diag.get("collector_summary") or []
+service_resource_budgets = metric_diag.get("service_resource_budgets") or []
 if missing:
     raise SystemExit(f"missing metrics nodes: {missing}")
 if stale:
@@ -459,6 +460,19 @@ for name in ("gpu", "containers", "processes"):
             raise SystemExit(f"collector summary {name} missing {key}: {row}")
     if row.get("status") != "ok":
         raise SystemExit(f"collector summary {name} is not ok: {row}")
+
+budget_by_service = {row.get("service_id"): row for row in service_resource_budgets}
+for service_id in ("orangepi-khoj", "sh-core-status-board-api"):
+    row = budget_by_service.get(service_id)
+    if not row:
+        raise SystemExit(f"service resource budget missing {service_id}: {service_resource_budgets}")
+    if row.get("status") != "ok":
+        raise SystemExit(f"service resource budget {service_id} is not ok: {row}")
+    if not row.get("matched_containers"):
+        raise SystemExit(f"service resource budget {service_id} matched no containers: {row}")
+status_board_budget = budget_by_service.get("sh-core-status-board-api") or {}
+if sorted(status_board_budget.get("matched_containers") or []) != ["rtime-status-board-gatus", "rtime-status-board-statusd"]:
+    raise SystemExit(f"status-board budget matched unexpected containers: {status_board_budget}")
 
 if len(metrics) != EXPECTED_NODE_COUNT:
     raise SystemExit(f"metrics node count = {len(metrics)}, want {EXPECTED_NODE_COUNT}")
@@ -478,6 +492,7 @@ print(f"  diagnostics overall: {diagnostics.get('overall')}")
 print(f"  reporting nodes: {len(metric_diag.get('reporting_nodes') or [])}/{len(metric_diag.get('expected_nodes') or [])}")
 print(f"  metrics nodes: {len(metrics)}")
 print(f"  collector summaries: {len(collector_summary)}")
+print(f"  service resource budgets: {len(service_resource_budgets)}")
 print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_names)}")
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
 print(f"  API requests observed: {request_diag.get('total')} routes={len(request_diag.get('routes') or [])}")

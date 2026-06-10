@@ -86,6 +86,13 @@ services:
     kind: http
     endpoint_key: core_status-board-api
     critical: false
+    resource_budget:
+      container_names:
+        - rtime-status-board-statusd
+        - rtime-status-board-gatus
+      compose_project: rtime-status-board
+      max_memory_mib: 160
+      max_cpu_percent: 50
   - id: proxy-ping
     name: Proxy reachability
     node_id: proxy
