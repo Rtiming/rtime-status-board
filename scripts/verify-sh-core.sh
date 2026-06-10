@@ -499,7 +499,7 @@ if status_board_budget.get("memory_headroom_bytes", 0) <= 0 or status_board_budg
 if len(project_diag) != len(projects):
     raise SystemExit(f"project diagnostics rows = {len(project_diag)}, want {len(projects)}: {project_diag}")
 for row in project_diag:
-    for key in ("project_id", "status", "service_count", "endpoint_count", "check_coverage_percent", "recent_check_count", "recent_success_count", "recent_failure_count", "recent_failure_percent", "no_recent_check_count", "current_avg_response_time_ms", "current_max_response_time_ms", "recent_event_count", "recent_event_kind_counts", "recent_event_status_counts", "ops_status", "ops_issue_count", "ops_error_count", "ops_warn_count", "ops_info_count", "ops_detail", "detail"):
+    for key in ("project_id", "status", "service_count", "endpoint_count", "check_coverage_percent", "agent_status", "agent_detail", "agent_report_count", "agent_failed_report_count", "agent_collector_failures", "agent_max_report_lag_seconds", "agent_lag_warn_seconds", "agent_lag_headroom_seconds", "agent_gpu_node_count", "recent_check_count", "recent_success_count", "recent_failure_count", "recent_failure_percent", "no_recent_check_count", "current_avg_response_time_ms", "current_max_response_time_ms", "recent_event_count", "recent_event_kind_counts", "recent_event_status_counts", "ops_status", "ops_issue_count", "ops_error_count", "ops_warn_count", "ops_info_count", "ops_detail", "detail"):
         if key not in row:
             raise SystemExit(f"project diagnostics row missing {key}: {row}")
     if row.get("status") != "ok":
@@ -516,6 +516,16 @@ for row in project_diag:
         raise SystemExit(f"project diagnostics row has endpoints without recent logs: {row}")
     if row.get("current_avg_response_time_ms", -1) < 0 or row.get("current_max_response_time_ms", -1) < 0:
         raise SystemExit(f"project diagnostics row has invalid response latency fields: {row}")
+    if row.get("agent_status") != "ok":
+        raise SystemExit(f"project diagnostics row has unhealthy agent rollup: {row}")
+    if row.get("agent_report_count", 0) < 1:
+        raise SystemExit(f"project diagnostics row has no related agent reports: {row}")
+    if row.get("agent_failed_report_count", 0) != 0 or row.get("agent_collector_failures", 0) != 0:
+        raise SystemExit(f"project diagnostics row has agent failures: {row}")
+    if row.get("agent_lag_warn_seconds", 0) < 1:
+        raise SystemExit(f"project diagnostics row has invalid agent lag budget: {row}")
+    if row.get("agent_lag_headroom_seconds", 0) <= 0:
+        raise SystemExit(f"project diagnostics row has no positive agent lag headroom: {row}")
     kind_total = sum((item or {}).get("count", 0) for item in row.get("recent_event_kind_counts") or [])
     status_counts = row.get("recent_event_status_counts") or {}
     status_total = sum(status_counts.get(key, 0) for key in ("ok", "degraded", "down", "unknown", "maintenance"))

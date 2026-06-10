@@ -465,6 +465,16 @@ type ProjectDiagnostic struct {
 	MetricsReportingNodes   []string         `json:"metrics_reporting_nodes"`
 	MetricsMissingNodes     []string         `json:"metrics_missing_nodes"`
 	MetricsStaleNodes       []string         `json:"metrics_stale_nodes"`
+	AgentStatus             Status           `json:"agent_status"`
+	AgentDetail             string           `json:"agent_detail"`
+	AgentReportCount        int              `json:"agent_report_count"`
+	AgentFailedReportCount  int              `json:"agent_failed_report_count"`
+	AgentCollectorFailures  int              `json:"agent_collector_failures"`
+	AgentMaxReportLag       float64          `json:"agent_max_report_lag_seconds"`
+	AgentLagWarnSeconds     float64          `json:"agent_lag_warn_seconds"`
+	AgentLagHeadroomSeconds float64          `json:"agent_lag_headroom_seconds"`
+	AgentUnhealthyNodes     []string         `json:"agent_unhealthy_nodes,omitempty"`
+	AgentGPUNodeCount       int              `json:"agent_gpu_node_count"`
 	RecentCheckCount        int              `json:"recent_check_count"`
 	RecentSuccessCount      int              `json:"recent_success_count"`
 	RecentFailureCount      int              `json:"recent_failure_count"`

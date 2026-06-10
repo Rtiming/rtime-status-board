@@ -219,9 +219,12 @@ counts, and target-status counts for the related bounded status log. Each row
 also embeds the matching `ops.project_impacts` rollup fields as `ops_status`,
 severity counts, issue kinds, affected nodes/services, and `ops_detail`,
 keeping project troubleshooting in one table without changing the primary
-project service-check status. It reuses the diagnostics request's already-loaded
-services, endpoint statuses, recent SQLite events, metrics freshness data, and
-Ops issue rollup.
+project service-check status. Each row also includes related-node agent health
+rollup fields: `agent_status`, `agent_detail`, report and failed-report counts,
+collector failure totals, max report lag, lag budget/headroom, unhealthy nodes,
+and GPU node count. It reuses the diagnostics request's already-loaded services,
+endpoint statuses, recent SQLite events, metrics freshness data, Agent health
+rollup, and Ops issue rollup.
 
 `/api/v1/diagnostics.event_log` embeds the latest status-change events from the
 existing SQLite event table. It is bounded to the latest 20 events in the

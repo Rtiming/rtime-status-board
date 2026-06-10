@@ -361,7 +361,11 @@ project transitions without opening the raw log. It also embeds the matching
 `ops.project_impacts` rollup fields
 (`ops_status`, severity counts, issue kinds, affected nodes/services, and
 detail) so a project row can show service-check health and operational impact
-side by side. It performs no additional checks and writes no history.
+side by side. The same row now also aggregates related-node agent health from
+the bounded agent report log rollup: agent status/detail, report/failure
+counts, collector failure total, max report lag, lag budget/headroom, unhealthy
+nodes, and GPU node count. It performs no additional checks and writes no
+history.
 `/api/v1/diagnostics.event_log` embeds a bounded newest-first status-change log
 from SQLite. It returns total event rows, returned rows, latest event time,
 kind counts, target-status counts, and the latest events. It is read-only and

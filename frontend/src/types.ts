@@ -473,6 +473,16 @@ export interface ProjectDiagnostic {
   metrics_reporting_nodes: string[];
   metrics_missing_nodes: string[];
   metrics_stale_nodes: string[];
+  agent_status: Status;
+  agent_detail: string;
+  agent_report_count: number;
+  agent_failed_report_count: number;
+  agent_collector_failures: number;
+  agent_max_report_lag_seconds: number;
+  agent_lag_warn_seconds: number;
+  agent_lag_headroom_seconds: number;
+  agent_unhealthy_nodes?: string[];
+  agent_gpu_node_count: number;
   recent_check_count: number;
   recent_success_count: number;
   recent_failure_count: number;

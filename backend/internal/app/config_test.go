@@ -383,6 +383,50 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 			IssueKinds:       []string{"status-volatility"},
 			Detail:           "2 issues across 1 kinds",
 		},
+	}, []AgentNodeDiagnostic{
+		{
+			NodeID:                   "node-a",
+			Status:                   StatusOK,
+			Detail:                   "recent agent reports are clean",
+			ReportCount:              2,
+			LatestReceivedAt:         timePtr(base),
+			LatestReportLagSeconds:   1,
+			ReportLagWarnSeconds:     agentReportLagWarnSeconds,
+			ReportLagHeadroomSeconds: agentReportLagWarnSeconds - 1,
+			GPUAvailable:             true,
+		},
+		{
+			NodeID:                   "node-b",
+			Status:                   StatusOK,
+			Detail:                   "recent agent reports are clean",
+			ReportCount:              1,
+			LatestReceivedAt:         timePtr(base.Add(-time.Second)),
+			LatestReportLagSeconds:   2,
+			ReportLagWarnSeconds:     agentReportLagWarnSeconds,
+			ReportLagHeadroomSeconds: agentReportLagWarnSeconds - 2,
+		},
+		{
+			NodeID:                   "node-c",
+			Status:                   StatusOK,
+			Detail:                   "recent agent reports are clean",
+			ReportCount:              1,
+			LatestReceivedAt:         timePtr(base.Add(-2 * time.Second)),
+			LatestReportLagSeconds:   3,
+			ReportLagWarnSeconds:     agentReportLagWarnSeconds,
+			ReportLagHeadroomSeconds: agentReportLagWarnSeconds - 3,
+		},
+		{
+			NodeID:                   "node-d",
+			Status:                   StatusDegraded,
+			Detail:                   "latest report has collector failures",
+			ReportCount:              2,
+			FailedReportCount:        1,
+			CollectorFailureCount:    2,
+			LatestReceivedAt:         timePtr(base.Add(-3 * time.Second)),
+			LatestReportLagSeconds:   35,
+			ReportLagWarnSeconds:     agentReportLagWarnSeconds,
+			ReportLagHeadroomSeconds: agentReportLagWarnSeconds - 35,
+		},
 	})
 	if len(diag) != 1 {
 		t.Fatalf("project diagnostics = %#v, want one row", diag)
@@ -433,6 +477,15 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 	if !stringSliceEqual(row.OpsIssueKinds, []string{"status-volatility"}) || !stringSliceEqual(row.OpsAffectedNodes, []string{"node-a"}) || !stringSliceEqual(row.OpsAffectedServices, []string{"svc-down"}) {
 		t.Fatalf("ops impact detail = kinds:%#v nodes:%#v services:%#v", row.OpsIssueKinds, row.OpsAffectedNodes, row.OpsAffectedServices)
 	}
+	if row.AgentStatus != StatusDegraded || row.AgentReportCount != 6 || row.AgentFailedReportCount != 1 || row.AgentCollectorFailures != 2 || row.AgentGPUNodeCount != 1 {
+		t.Fatalf("agent summary = %#v, want degraded aggregate with reports/failures/gpu count", row)
+	}
+	if row.AgentMaxReportLag != 35 || row.AgentLagWarnSeconds != agentReportLagWarnSeconds || row.AgentLagHeadroomSeconds != agentReportLagWarnSeconds-35 {
+		t.Fatalf("agent lag summary = %#v, want max lag 35s and headroom", row)
+	}
+	if !stringSliceEqual(row.AgentUnhealthyNodes, []string{"node-d"}) || !strings.Contains(row.AgentDetail, "1 related agent nodes need attention") {
+		t.Fatalf("agent detail = %#v / %q, want node-d attention", row.AgentUnhealthyNodes, row.AgentDetail)
+	}
 }
 
 func TestProjectDiagnosticsFlagsMissingRecentCheckLogs(t *testing.T) {
@@ -448,7 +501,18 @@ func TestProjectDiagnosticsFlagsMissingRecentCheckLogs(t *testing.T) {
 		ReportingNodes: []string{"node-a"},
 	}, []RuntimeEndpointStatus{
 		{Key: "endpoint-a", Status: StatusOK, RecentResults: 0, RecentFailures: 0, ResponseTimeMS: 3},
-	}, nil, nil)
+	}, nil, nil, []AgentNodeDiagnostic{
+		{
+			NodeID:                   "node-a",
+			Status:                   StatusOK,
+			Detail:                   "recent agent reports are clean",
+			ReportCount:              1,
+			LatestReceivedAt:         timePtr(time.Date(2026, 6, 10, 8, 0, 0, 0, time.UTC)),
+			LatestReportLagSeconds:   1,
+			ReportLagWarnSeconds:     agentReportLagWarnSeconds,
+			ReportLagHeadroomSeconds: agentReportLagWarnSeconds - 1,
+		},
+	})
 
 	if len(diag) != 1 {
 		t.Fatalf("project diagnostics = %#v, want one row", diag)
@@ -909,6 +973,10 @@ func TestOpsDiagnosticIsEmptyWhenHealthy(t *testing.T) {
 }
 
 func floatPtr(value float64) *float64 {
+	return &value
+}
+
+func timePtr(value time.Time) *time.Time {
 	return &value
 }
 

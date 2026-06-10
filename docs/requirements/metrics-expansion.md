@@ -206,6 +206,11 @@ Current implementation status:
   `ops_status`, severity counts, issue kinds, affected nodes/services, and
   detail. This keeps project rows tied to the action-oriented Ops digest without
   adding another query, collector, or polling loop.
+- Project coverage rows now also aggregate related-node Agent health from the
+  already-loaded bounded report logs: report counts, failed reports, collector
+  failure totals, max lag, lag budget/headroom, unhealthy nodes, and GPU node
+  count. This makes project-level collector freshness visible in the global
+  Diagnostics table without adding a new API call or collector.
 - Project detail now also shows a bounded related-node Agent report view by
   reading `GET /api/v1/metrics/reports?limit=100` once and filtering to the
   project's nodes. This gives project-level collector freshness, lag, schema,

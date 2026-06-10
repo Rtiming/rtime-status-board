@@ -3,7 +3,7 @@ import { AgentReportRow, Metric, Panel, Row } from '../../shared/components';
 import { formatBytes, formatCount, formatDuration, formatEventKindCounts, formatHeadroomCell, formatLatencyMS, formatList, formatOpsIssue, formatSeconds, formatSignedOpsValue, formatStatusCountSummary, formatThresholdRate, formatTime } from '../../shared/format';
 import { dictionary, type Lang } from '../../shared/i18n';
 import { StatusPill, statusLabel } from '../../shared/status';
-import type { AgentNodeDiagnostic, DiagnosticsResponse, RuntimeEndpointStatus, ServiceResourceBudgetStatus, StatusCounts } from '../../types';
+import type { AgentNodeDiagnostic, DiagnosticsResponse, ProjectDiagnostic, RuntimeEndpointStatus, ServiceResourceBudgetStatus, StatusCounts } from '../../types';
 
 const emptyStatusCounts: StatusCounts = {
   ok: 0,
@@ -184,6 +184,10 @@ export function Diagnostics({
                     <td>
                       <strong>{project.metrics_reporting_nodes.length}/{project.related_nodes.length}</strong>
                       <span>{t.nodes}: {formatList(project.related_nodes)}</span>
+                      <span>{t.agentHealth}: <StatusPill status={project.agent_status ?? 'unknown'} lang={lang} /></span>
+                      <span>{t.reports}: {project.agent_report_count ?? 0} · {t.failedReports}: {project.agent_failed_report_count ?? 0} · {t.collectorFailures}: {project.agent_collector_failures ?? 0}</span>
+                      <span>{t.lagBudget}: {formatProjectAgentLag(project)}</span>
+                      <span>{t.gpuNodes}: {project.agent_gpu_node_count ?? 0} · {t.unhealthy}: {formatList(project.agent_unhealthy_nodes)}</span>
                       {(project.metrics_missing_nodes.length > 0 || project.metrics_stale_nodes.length > 0) && (
                         <span>{t.missing}: {formatList(project.metrics_missing_nodes)} · {t.stale}: {formatList(project.metrics_stale_nodes)}</span>
                       )}
@@ -849,6 +853,13 @@ function formatProjectPercent(value: number | undefined) {
 
 function formatLatencyPair(avg: number | undefined, max: number | undefined, avgLabel: string, maxLabel: string) {
   return `${avgLabel} ${formatLatencyMS(avg)} · ${maxLabel} ${formatLatencyMS(max)}`;
+}
+
+function formatProjectAgentLag(project: ProjectDiagnostic) {
+  const lag = formatSeconds(project.agent_max_report_lag_seconds ?? 0);
+  if (!project.agent_lag_warn_seconds) return lag;
+  const remaining = formatSignedOpsValue(project.agent_lag_headroom_seconds ?? 0, 's');
+  return `${lag} / ${formatSeconds(project.agent_lag_warn_seconds)} · ${remaining}`;
 }
 
 function formatAgentReportLag(row: AgentNodeDiagnostic, remainingLabel: string) {

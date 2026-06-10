@@ -511,16 +511,16 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 	opsStart := time.Now()
 	ops := a.opsDiagnostic(generatedAt, services, metrics, metricsDiagnostic, issues, statusVolatility)
 	recordStage("ops-rollup", opsStart, StatusOK, fmt.Sprintf("%d ops issues", len(ops.Issues)))
+	agentHealthStart := time.Now()
+	agentHealth := agentReportDiagnostics(agentReports, metricsDiagnostic)
+	recordStage("agent-health-rollup", agentHealthStart, StatusOK, fmt.Sprintf("%d agent health rows", len(agentHealth)))
 	deploymentStart := time.Now()
 	deployment := a.deploymentDiagnosticCached(storeDiagnostic, generatedAt)
 	recordStage("deployment-checks", deploymentStart, deployment.Status, fmt.Sprintf("%d deployment checks", len(deployment.Checks)), deploymentDiagnosticsWarnMS)
 	projectDiagnosticsStart := time.Now()
-	projectDiagnostics := a.projectDiagnostics(projects, services, metricsDiagnostic, endpoints, recentEvents, ops.ProjectImpacts)
+	projectDiagnostics := a.projectDiagnostics(projects, services, metricsDiagnostic, endpoints, recentEvents, ops.ProjectImpacts, agentHealth)
 	recordStage("project-diagnostics", projectDiagnosticsStart, StatusOK, fmt.Sprintf("%d project rows", len(projectDiagnostics)))
 	eventLog := eventLogDiagnostic(storeDiagnostic.EventRows, recentEvents)
-	agentHealthStart := time.Now()
-	agentHealth := agentReportDiagnostics(agentReports, metricsDiagnostic)
-	recordStage("agent-health-rollup", agentHealthStart, StatusOK, fmt.Sprintf("%d agent health rows", len(agentHealth)))
 	if storeDiagnosticErr != nil && eventLog.Total < eventLog.Returned {
 		eventLog.Total = eventLog.Returned
 	}
@@ -735,7 +735,7 @@ func eventLogDiagnostic(total int, events []Event) EventLogDiagnostic {
 	return diag
 }
 
-func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []ServiceView, metricsDiagnostic MetricsDiagnostic, endpoints []RuntimeEndpointStatus, events []Event, impacts []OpsProjectImpact) []ProjectDiagnostic {
+func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []ServiceView, metricsDiagnostic MetricsDiagnostic, endpoints []RuntimeEndpointStatus, events []Event, impacts []OpsProjectImpact, agentHealth []AgentNodeDiagnostic) []ProjectDiagnostic {
 	endpointKeys := map[string]bool{}
 	endpointStatusByKey := map[string]RuntimeEndpointStatus{}
 	for _, endpoint := range endpoints {
@@ -751,6 +751,12 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 	for _, impact := range impacts {
 		if impact.ProjectID != "" {
 			impactByProject[impact.ProjectID] = impact
+		}
+	}
+	agentHealthByNode := map[string]AgentNodeDiagnostic{}
+	for _, row := range agentHealth {
+		if row.NodeID != "" {
+			agentHealthByNode[row.NodeID] = row
 		}
 	}
 
@@ -850,6 +856,17 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 		diag.MetricsReportingNodes = sortedKeys(metricsReporting)
 		diag.MetricsMissingNodes = sortedKeys(metricsMissing)
 		diag.MetricsStaleNodes = sortedKeys(metricsStale)
+		agentSummary := projectAgentSummary(nodeSet, agentHealthByNode)
+		diag.AgentStatus = agentSummary.Status
+		diag.AgentDetail = agentSummary.Detail
+		diag.AgentReportCount = agentSummary.ReportCount
+		diag.AgentFailedReportCount = agentSummary.FailedReportCount
+		diag.AgentCollectorFailures = agentSummary.CollectorFailureCount
+		diag.AgentMaxReportLag = agentSummary.MaxReportLagSeconds
+		diag.AgentLagWarnSeconds = agentSummary.LagWarnSeconds
+		diag.AgentLagHeadroomSeconds = agentSummary.LagHeadroomSeconds
+		diag.AgentUnhealthyNodes = agentSummary.UnhealthyNodes
+		diag.AgentGPUNodeCount = agentSummary.GPUNodeCount
 		if impact, ok := impactByProject[project.ID]; ok {
 			diag.OpsStatus = impact.Status
 			diag.OpsIssueCount = impact.IssueCount
@@ -883,6 +900,9 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 		if len(diag.MetricsStaleNodes) > 0 {
 			details = append(details, fmt.Sprintf("%d related nodes have stale metrics", len(diag.MetricsStaleNodes)))
 		}
+		if diag.AgentStatus != StatusOK {
+			details = append(details, diag.AgentDetail)
+		}
 		if len(details) > 0 {
 			diag.Status = projectDiagnosticStatus(diag, project.Status)
 			diag.Detail = strings.Join(details, "; ")
@@ -901,6 +921,67 @@ type projectEventSummaryResult struct {
 	LatestAt     *time.Time
 	KindCounts   []EventKindCount
 	StatusCounts StatusCounts
+}
+
+type projectAgentSummaryResult struct {
+	Status                Status
+	Detail                string
+	ReportCount           int
+	FailedReportCount     int
+	CollectorFailureCount int
+	MaxReportLagSeconds   float64
+	LagWarnSeconds        float64
+	LagHeadroomSeconds    float64
+	UnhealthyNodes        []string
+	GPUNodeCount          int
+}
+
+func projectAgentSummary(nodeSet map[string]bool, agentHealthByNode map[string]AgentNodeDiagnostic) projectAgentSummaryResult {
+	nodeIDs := sortedKeys(nodeSet)
+	summary := projectAgentSummaryResult{
+		Status:             StatusOK,
+		Detail:             "related agent reports are clean",
+		LagWarnSeconds:     agentReportLagWarnSeconds,
+		LagHeadroomSeconds: agentReportLagWarnSeconds,
+	}
+	if len(nodeIDs) == 0 {
+		summary.Status = StatusUnknown
+		summary.Detail = "project has no related nodes for agent reports"
+		return summary
+	}
+
+	for _, nodeID := range nodeIDs {
+		row, ok := agentHealthByNode[nodeID]
+		if !ok {
+			summary.Status = StatusDegraded
+			summary.UnhealthyNodes = append(summary.UnhealthyNodes, nodeID)
+			continue
+		}
+		summary.ReportCount += row.ReportCount
+		summary.FailedReportCount += row.FailedReportCount
+		summary.CollectorFailureCount += row.CollectorFailureCount
+		if row.GPUAvailable {
+			summary.GPUNodeCount++
+		}
+		if row.ReportLagWarnSeconds > summary.LagWarnSeconds {
+			summary.LagWarnSeconds = row.ReportLagWarnSeconds
+		}
+		if row.LatestReceivedAt != nil && row.LatestReportLagSeconds > summary.MaxReportLagSeconds {
+			summary.MaxReportLagSeconds = row.LatestReportLagSeconds
+		}
+		if row.Status != StatusOK {
+			summary.Status = aggregateOverall([]Status{summary.Status, row.Status})
+			summary.UnhealthyNodes = append(summary.UnhealthyNodes, nodeID)
+		}
+	}
+
+	summary.LagHeadroomSeconds = summary.LagWarnSeconds - summary.MaxReportLagSeconds
+	if summary.Status != StatusOK {
+		summary.Detail = fmt.Sprintf("%d related agent nodes need attention; %d failed reports; %d collector failures", len(summary.UnhealthyNodes), summary.FailedReportCount, summary.CollectorFailureCount)
+		return summary
+	}
+	summary.Detail = fmt.Sprintf("agent reports clean across %d nodes", len(nodeIDs))
+	return summary
 }
 
 func projectEventSummary(projectID string, serviceSet map[string]bool, nodeSet map[string]bool, events []Event) projectEventSummaryResult {
@@ -967,7 +1048,7 @@ func projectDiagnosticStatus(diag ProjectDiagnostic, projectStatus Status) Statu
 	if diag.DownServiceCount > 0 {
 		return StatusDown
 	}
-	if diag.ServiceCount == 0 || diag.UnmappedServiceCount > 0 || diag.MissingEndpointCount > 0 || diag.NoRecentCheckCount > 0 || len(diag.MetricsMissingNodes) > 0 || len(diag.MetricsStaleNodes) > 0 {
+	if diag.ServiceCount == 0 || diag.UnmappedServiceCount > 0 || diag.MissingEndpointCount > 0 || diag.NoRecentCheckCount > 0 || len(diag.MetricsMissingNodes) > 0 || len(diag.MetricsStaleNodes) > 0 || diag.AgentStatus != StatusOK {
 		return StatusDegraded
 	}
 	if diag.DegradedServiceCount > 0 {
