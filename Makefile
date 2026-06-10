@@ -13,7 +13,7 @@ COMPOSE_DEV := docker compose -p $(PROJECT_NAME)-dev -f compose.dev.yml --env-fi
 COMPOSE_PROD := docker compose -p $(PROJECT_NAME) -f compose.prod.yml --env-file .env.production
 DOCKER_GO := ./scripts/run-with-timeout.sh $(GO_TIMEOUT_SECONDS) docker run --rm -e GOPROXY=$(GO_PROXY) -v "$$(pwd)":/workspace -w /workspace/backend $(GO_IMAGE)
 
-.PHONY: help init-env init-prod-env init-config dev dev-down build prod-artifacts backend-prod-artifact frontend-prod-artifact test verify verify-local clean-generated backend-test backend-test-sh-core clean-sh-core-check-cache frontend-test config-check compose-dev-config compose-prod-config deploy-sh-core verify-sh-core install-compose-sh-core prod-up-sh-core prod-logs-sh-core prod-ps-sh-core prod-down-sh-core prod-up prod-logs prod-ps prod-down
+.PHONY: help init-env init-prod-env init-config dev dev-down build prod-artifacts backend-prod-artifact frontend-prod-artifact test verify verify-local clean-generated backend-test backend-test-sh-core clean-sh-core-check-cache frontend-test config-check compose-dev-config compose-prod-config deploy-sh-core verify-sh-core install-compose-sh-core install-status-https-sh-core prod-up-sh-core prod-logs-sh-core prod-ps-sh-core prod-down-sh-core prod-up prod-logs prod-ps prod-down
 
 help:
 	@sed -n '1,140p' Makefile
@@ -45,7 +45,7 @@ frontend-prod-artifact:
 
 backend-prod-artifact:
 	mkdir -p dist
-	cd backend && go mod download && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../dist/statusd-linux-amd64 ./cmd/statusd
+	$(DOCKER_GO) sh -c 'go mod download && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../dist/statusd-linux-amd64 ./cmd/statusd'
 
 test: config-check backend-test frontend-test compose-dev-config compose-prod-config
 
@@ -80,7 +80,7 @@ compose-dev-config: init-env init-config
 compose-prod-config: init-prod-env init-config
 	$(COMPOSE_PROD) config >/tmp/$(PROJECT_NAME).prod.compose.yml
 
-deploy-sh-core: init-config frontend-prod-artifact
+deploy-sh-core: init-config prod-artifacts
 	./scripts/deploy-sh-core.sh
 
 verify-sh-core:
@@ -88,6 +88,9 @@ verify-sh-core:
 
 install-compose-sh-core:
 	./scripts/install-compose-sh-core.sh
+
+install-status-https-sh-core:
+	./scripts/install-status-https-sh-core.sh
 
 prod-up-sh-core:
 	./scripts/prod-compose-sh-core.sh up

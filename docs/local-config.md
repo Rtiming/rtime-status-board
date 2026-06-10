@@ -13,6 +13,9 @@ These files are committed and should contain placeholders only:
 
 Use documentation-safe values such as `status.example.com`, `203.0.113.10`,
 and `100.64.10.x` in examples.
+The Nginx example may show an HTTPS server block, but it must reference
+placeholder certificate paths only. Real certificates and htpasswd files live
+on the deployment host and are never committed.
 
 ## Ignored Real Files
 
@@ -34,6 +37,16 @@ make init-config
 ```
 
 Then edit the generated real files for the target deployment.
+
+For sh-core HTTPS, keep the real domain and IP in `.env.production`, then run:
+
+```bash
+make install-status-https-sh-core
+```
+
+That command uses the ignored real environment file, installs the certificate
+on sh-core, backs up the live Nginx status-board config, and reloads Nginx only
+after `nginx -t` succeeds.
 
 ## Publishing Rule
 

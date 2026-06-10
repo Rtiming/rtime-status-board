@@ -225,6 +225,12 @@ if ! ss -ltn | awk '$4 ~ /:80$/ { found = 1 } END { exit found ? 0 : 1 }'; then
 fi
 echo "  public nginx port 80 listening"
 
+if ! ss -ltn | awk '$4 ~ /:443$/ { found = 1 } END { exit found ? 0 : 1 }'; then
+  echo "[ERROR] public nginx port 443 is not listening" >&2
+  exit 1
+fi
+echo "  public nginx port 443 listening"
+
 echo "[REMOTE] nginx entry health"
 tailnet_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.tailnet-health.json -w "%{http_code}" "$TAILNET_STATUS_URL/api/v1/health" || true)"
 if [[ "$tailnet_status" != "200" ]]; then
@@ -259,6 +265,14 @@ if [[ "$public_domain_status" != "401" ]]; then
   exit 1
 fi
 echo "  public domain unauthenticated check: 401"
+
+public_https_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.public-domain-https.html -w "%{http_code}" --resolve "$STATUS_DOMAIN:443:127.0.0.1" "https://$STATUS_DOMAIN/api/v1/health" || true)"
+if [[ "$public_https_status" != "401" ]]; then
+  echo "[ERROR] public HTTPS domain entry without credentials returned HTTP $public_https_status, want 401" >&2
+  cat /tmp/rtime-status-board.public-domain-https.html >&2 || true
+  exit 1
+fi
+echo "  public HTTPS domain unauthenticated check: 401"
 
 public_ip_path_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.public-ip.html -w "%{http_code}" -H "Host: $PUBLIC_IP" "http://127.0.0.1/status-board/api/v1/health" || true)"
 if [[ "$public_ip_path_status" != "401" ]]; then

@@ -146,8 +146,8 @@ telemetry schema, metrics agent freshness, collector issues, recent agent
 reports, per-collector coverage, all node/project/service detail endpoints, and
 bounded node/project metric-history windows and node/project/service check-log
 endpoints. It also verifies runtime API request diagnostics, the ops project
-impact rollup contract, and scans recent status-board container logs for
-fatal/error signatures. It runs `rtime-doctor`
+impact rollup contract, public HTTPS SNI/certificate routing, and scans recent
+status-board container logs for fatal/error signatures. It runs `rtime-doctor`
 by default. To skip
 the broader rtime network doctor during a quick status-board check:
 
@@ -179,9 +179,21 @@ Example entries:
 - Tailnet: `http://100.64.10.5:18083/`
 - Public IP path: `http://203.0.113.10/status-board/`
 - Public domain path after DNS: `http://status.example.com/`
+- Public HTTPS domain path after certificate install:
+  `https://status.example.com/`
 
 Replace these in `.env.production` and
 `deploy/nginx/status.local.conf` for a real deployment.
+
+On sh-core, install or refresh the public HTTPS entry with:
+
+```bash
+make install-status-https-sh-core
+```
+
+The script uses acme.sh DNS-01 issuance, writes the public certificate under
+`/etc/nginx/ssl`, backs up `/etc/nginx/conf.d/rtime-status-board.conf`, runs
+`nginx -t`, reloads Nginx, and checks HTTPS returns `401` without credentials.
 
 The public entries use Nginx Basic Auth. The htpasswd file lives on sh-core at
 `/etc/nginx/.htpasswd-rtime-status-board` and must not be committed.
@@ -196,6 +208,8 @@ actual domain and public IP:
 ```bash
 curl --noproxy '*' --resolve status.example.com:80:203.0.113.10 \
   -I http://status.example.com/api/v1/health
+curl --noproxy '*' --resolve status.example.com:443:203.0.113.10 \
+  -I https://status.example.com/api/v1/health
 ```
 
 Expect `401 Unauthorized` until credentials are supplied. If external DNS is
