@@ -635,6 +635,7 @@ export interface MetricsView {
 export interface MetricsHistoryResponse {
   node_id: string;
   window: string;
+  summary: MetricsHistorySummary;
   points: MetricsHistoryPoint[];
   returned: number;
 }
@@ -649,11 +650,11 @@ export interface ProjectMetricsHistoryResponse {
 
 export interface ProjectNodeMetricsHistory {
   node_id: string;
-  summary: ProjectMetricsSummary;
+  summary: MetricsHistorySummary;
   points: MetricsHistoryPoint[];
 }
 
-export interface ProjectMetricsSummary {
+export interface MetricsHistorySummary {
   samples: number;
   max_cpu_percent: number;
   max_memory_percent: number;
@@ -667,6 +668,8 @@ export interface ProjectMetricsSummary {
   gpu_available: boolean;
   max_gpu_percent: number;
 }
+
+export type ProjectMetricsSummary = MetricsHistorySummary;
 
 export interface MetricsHistoryPoint {
   node_id: string;

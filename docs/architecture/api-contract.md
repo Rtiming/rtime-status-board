@@ -100,7 +100,11 @@ The `schema` endpoint should tell the frontend which domains exist per node:
 CPU, memory, disk, network, IO, GPU, containers, and processes.
 
 Implemented node history windows accept Go-style durations such as `1h` and
-day windows such as `7d`, capped at 30 days.
+day windows such as `7d`, capped at 30 days. The response includes a `summary`
+object over the returned points: sample count, peak CPU/memory/disk, peak
+network RX/TX, peak storage read/write throughput and IOPS, and optional GPU
+peak. This keeps 24h/7d trend review cheap because the frontend can show the
+window peaks without issuing extra aggregation requests.
 
 The frontend Metrics tab now consumes `GET /api/v1/nodes/:id/metrics` directly
 for node detail charts. Retention is enforced in SQLite through
@@ -166,9 +170,10 @@ commands, read Docker sockets, or start a collector. The external
 `make verify-sh-core` acceptance script adds host-level checks that should not
 run inside the app process, including Docker container resource budgets, Nginx
 Basic Auth route checks, production directory hygiene, full node/project/service
-detail API smoke, and bounded check-log smoke for node, project, and service
-drill-down paths. The bounded check-log smoke also verifies the returned
-`summary` object for each sampled path. It also verifies that
+detail API smoke, bounded metrics-history smoke for `1h`, `24h`, and `7d`
+node/project windows, and bounded check-log smoke for node, project, and service
+drill-down paths. The metrics-history and check-log smokes also verify the
+returned `summary` objects for each sampled path. It also verifies that
 `runtime.requests` records prior API traffic, status classes, latency summary,
 and normalized route rows. The verifier also scans recent status-board container
 logs for fatal/error signatures such as panic, traceback, fatal, or structured

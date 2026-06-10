@@ -185,6 +185,10 @@ Current implementation status:
   `GET /api/v1/projects/:id/metrics?window=1h&limit=3000`; the Projects tab now
   shows per-related-node resource history and peak summaries without adding a
   separate collector.
+- Node metric history now also returns a bounded `summary` over the selected
+  `1h`, `24h`, or `7d` window, including sample count and peak CPU, memory,
+  disk, network, storage throughput/IOPS, and GPU utilization. The Metrics tab
+  uses this for trend-window peak cards without adding another query.
 - Storage read/write IOPS is now part of the lightweight compact history path.
   The backend derives it from existing v2 storage device IO counters, stores
   aggregate read/write IOPS in SQLite samples, returns it from node and project

@@ -697,6 +697,7 @@ type MetricsView struct {
 type MetricsHistoryResponse struct {
 	NodeID   string                `json:"node_id"`
 	Window   string                `json:"window"`
+	Summary  MetricsHistorySummary `json:"summary"`
 	Points   []MetricsHistoryPoint `json:"points"`
 	Returned int                   `json:"returned"`
 }
@@ -711,11 +712,11 @@ type ProjectMetricsHistoryResponse struct {
 
 type ProjectNodeMetricsHistory struct {
 	NodeID  string                `json:"node_id"`
-	Summary ProjectMetricsSummary `json:"summary"`
+	Summary MetricsHistorySummary `json:"summary"`
 	Points  []MetricsHistoryPoint `json:"points"`
 }
 
-type ProjectMetricsSummary struct {
+type MetricsHistorySummary struct {
 	Samples             int     `json:"samples"`
 	MaxCPUPercent       float64 `json:"max_cpu_percent"`
 	MaxMemoryPercent    float64 `json:"max_memory_percent"`
@@ -729,6 +730,8 @@ type ProjectMetricsSummary struct {
 	GPUAvailable        bool    `json:"gpu_available"`
 	MaxGPUPercent       float64 `json:"max_gpu_percent"`
 }
+
+type ProjectMetricsSummary = MetricsHistorySummary
 
 type MetricsReportLogsResponse struct {
 	GeneratedAt time.Time          `json:"generated_at"`

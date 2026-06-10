@@ -144,8 +144,8 @@ containers, status-board container resource budget, expected listening ports,
 Tailnet Nginx health, public Nginx Basic Auth boundaries, health endpoint,
 telemetry schema, metrics agent freshness, collector issues, recent agent
 reports, per-collector coverage, all node/project/service detail endpoints, and
-bounded node/project/service check-log endpoints. It also verifies runtime API
-request diagnostics and scans recent
+bounded node/project metric-history windows and node/project/service check-log
+endpoints. It also verifies runtime API request diagnostics and scans recent
 status-board container logs for fatal/error signatures. It runs `rtime-doctor`
 by default. To skip
 the broader rtime network doctor during a quick status-board check:
@@ -254,6 +254,10 @@ events, and a bounded recent agent report log read through
 aggregating the node's mapped service endpoints from Gatus recent results. It
 performs one Gatus status read on demand, does not write to SQLite, and does
 not add another polling loop.
+`/api/v1/nodes/:id/metrics` reuses existing SQLite samples and returns the
+selected history window plus a peak summary for CPU, memory, disk, network,
+storage IO throughput, storage IOPS, and optional GPU. The frontend uses this
+summary for 1h/24h/7d trend cards without issuing another aggregation request.
 `/api/v1/projects/:id` returns a lightweight project detail view assembled from
 existing summary data: related services, nodes, latest metrics, filtered
 related-node resource headroom, failures, and recent project/service/node

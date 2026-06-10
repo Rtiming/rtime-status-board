@@ -1940,6 +1940,23 @@ func TestProjectMetricsHistoryAggregatesRelatedNodes(t *testing.T) {
 	if apiResponse.ProjectID != "project-a" || apiResponse.Returned != 3 || len(apiResponse.Nodes) != 2 {
 		t.Fatalf("api response = %#v, want project-a with two related nodes", apiResponse)
 	}
+
+	nodeRequest := httptest.NewRequest(http.MethodGet, "/api/v1/nodes/node-a/metrics?window=7d", nil)
+	nodeRecorder := httptest.NewRecorder()
+	server.Router().ServeHTTP(nodeRecorder, nodeRequest)
+	if nodeRecorder.Code != http.StatusOK {
+		t.Fatalf("node history status = %d, body = %s", nodeRecorder.Code, nodeRecorder.Body.String())
+	}
+	var nodeResponse MetricsHistoryResponse
+	if err := json.Unmarshal(nodeRecorder.Body.Bytes(), &nodeResponse); err != nil {
+		t.Fatalf("decode node history: %v", err)
+	}
+	if nodeResponse.NodeID != "node-a" || nodeResponse.Returned != 2 || nodeResponse.Summary.Samples != 2 {
+		t.Fatalf("node history response = %#v, want node-a with summary samples", nodeResponse)
+	}
+	if nodeResponse.Summary.MaxCPUPercent != 33 || nodeResponse.Summary.MaxStorageReadIOPS != 10 || nodeResponse.Summary.MaxStorageWriteIOPS != 5 {
+		t.Fatalf("node history summary = %#v, want max cpu/read iops/write iops", nodeResponse.Summary)
+	}
 }
 
 func TestMetricsHistoryLimitKeepsNewestPoints(t *testing.T) {

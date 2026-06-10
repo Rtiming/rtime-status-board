@@ -416,6 +416,7 @@ func (s *Server) historyResponse(ctx context.Context, nodeID, window string) (Me
 	return MetricsHistoryResponse{
 		NodeID:   nodeID,
 		Window:   duration.String(),
+		Summary:  summarizeMetricsHistory(points),
 		Points:   points,
 		Returned: len(points),
 	}, nil

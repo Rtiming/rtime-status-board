@@ -302,6 +302,27 @@ def check_history_summary(scope, subject_id, checks):
         if key not in summary:
             raise SystemExit(f"{scope} checks summary missing {key} for {subject_id}: {summary}")
 
+def check_metrics_summary(scope, subject_id, response):
+    summary = response.get("summary") or {}
+    returned = response.get("returned", 0)
+    if summary.get("samples") != returned:
+        raise SystemExit(f"{scope} metrics summary sample mismatch for {subject_id}: {summary} returned={returned}")
+    for key in ("samples", "max_cpu_percent", "max_memory_percent", "max_disk_percent", "max_network_rx_bps", "max_network_tx_bps", "max_storage_read_bps", "max_storage_write_bps", "max_storage_read_iops", "max_storage_write_iops", "gpu_available", "max_gpu_percent"):
+        if key not in summary:
+            raise SystemExit(f"{scope} metrics summary missing {key} for {subject_id}: {summary}")
+
+def check_project_metrics_summary(project_id, response):
+    returned = response.get("returned", 0)
+    node_sample_total = 0
+    for node in response.get("nodes") or []:
+        summary = node.get("summary") or {}
+        node_sample_total += summary.get("samples", 0)
+        for key in ("samples", "max_cpu_percent", "max_memory_percent", "max_disk_percent", "max_network_rx_bps", "max_network_tx_bps", "max_storage_read_bps", "max_storage_write_bps", "max_storage_read_iops", "max_storage_write_iops", "gpu_available", "max_gpu_percent"):
+            if key not in summary:
+                raise SystemExit(f"project metrics summary missing {key} for {project_id}/{node.get('node_id')}: {summary}")
+    if node_sample_total != returned:
+        raise SystemExit(f"project metrics returned mismatch for {project_id}: node_sample_total={node_sample_total} returned={returned}")
+
 diagnostics = get("/api/v1/diagnostics")
 metrics = get("/api/v1/metrics")
 schema = get("/api/v1/telemetry/schema")
@@ -409,6 +430,27 @@ for service in services:
     if service.get("endpoint_key") and "latest_check" not in detail:
         raise SystemExit(f"service detail missing latest_check for {service_id}")
 print(f"  service details: {len(services)}")
+
+print("[REMOTE] metrics history window smoke")
+for node in nodes:
+    node_id = node.get("id")
+    if not node_id:
+        continue
+    for window in ("1h", "24h", "7d"):
+        path = "/api/v1/nodes/" + urllib.parse.quote(node_id, safe="") + "/metrics?window=" + window
+        history = get(path)
+        check_metrics_summary("node", f"{node_id}/{window}", history)
+print(f"  node metrics histories: {len(nodes)} nodes x 3 windows")
+
+for project in projects:
+    project_id = project.get("id")
+    if not project_id:
+        continue
+    for window in ("1h", "24h", "7d"):
+        path = "/api/v1/projects/" + urllib.parse.quote(project_id, safe="") + "/metrics?window=" + window + "&limit=3000"
+        history = get(path)
+        check_project_metrics_summary(project_id + "/" + window, history)
+print(f"  project metrics histories: {len(projects)} projects x 3 windows")
 
 print("[REMOTE] bounded check log smoke")
 for node in nodes:

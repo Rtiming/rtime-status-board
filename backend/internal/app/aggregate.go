@@ -159,7 +159,7 @@ func (a *Aggregator) ProjectMetricsHistory(ctx context.Context, projectID string
 		}
 		response.Nodes = append(response.Nodes, ProjectNodeMetricsHistory{
 			NodeID:  nodeID,
-			Summary: summarizeProjectMetrics(points),
+			Summary: summarizeMetricsHistory(points),
 			Points:  points,
 		})
 		response.Returned += len(points)
@@ -1643,8 +1643,8 @@ func projectOwnsService(project ProjectConfig, service ServiceView) bool {
 	return false
 }
 
-func summarizeProjectMetrics(points []MetricsHistoryPoint) ProjectMetricsSummary {
-	summary := ProjectMetricsSummary{Samples: len(points)}
+func summarizeMetricsHistory(points []MetricsHistoryPoint) MetricsHistorySummary {
+	summary := MetricsHistorySummary{Samples: len(points)}
 	for _, point := range points {
 		summary.MaxCPUPercent = maxFloat(summary.MaxCPUPercent, point.CPUPercent)
 		summary.MaxMemoryPercent = maxFloat(summary.MaxMemoryPercent, point.MemoryPercent)

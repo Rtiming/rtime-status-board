@@ -132,6 +132,7 @@ function MetricHistoryPanel({
   const t = dictionary[lang];
   const points = history?.points ?? [];
   const latest = points.at(-1);
+  const summary = history?.summary;
   return (
     <section className="panel detail-panel">
       <div className="detail-head">
@@ -158,10 +159,10 @@ function MetricHistoryPanel({
       {!historyLoading && points.length === 0 && <div className="empty inline-empty">{t.noHistory}</div>}
 
       <div className="detail-stat-grid">
-        <Metric icon={Gauge} label={t.samples} value={String(history?.returned ?? 0)} />
+        <Metric icon={Gauge} label={t.samples} value={String(summary?.samples ?? history?.returned ?? 0)} />
         <Metric icon={Activity} label={t.cpu} value={latest ? `${latest.cpu_percent.toFixed(1)}%` : `${metric.cpu.percent.toFixed(1)}%`} />
-        <Metric icon={Signal} label={t.network} value={latest ? `${formatRate(latest.network_rx_bps)} / ${formatRate(latest.network_tx_bps)}` : '-'} />
-        <Metric icon={Server} label={t.storageIO} value={latest ? `${formatRate(latest.storage_read_bps)} / ${formatRate(latest.storage_write_bps)}` : '-'} />
+        <Metric icon={Signal} label={`${t.peak} ${t.network}`} value={summary ? `${formatRate(summary.max_network_rx_bps)} / ${formatRate(summary.max_network_tx_bps)}` : '-'} />
+        <Metric icon={Server} label={`${t.peak} ${t.storageOps}`} value={summary ? `${formatIOPS(summary.max_storage_read_iops)} / ${formatIOPS(summary.max_storage_write_iops)}` : '-'} />
       </div>
 
       <MetricResourceDetails metric={metric} lang={lang} />
