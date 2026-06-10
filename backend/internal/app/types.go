@@ -379,6 +379,7 @@ type RuntimeDiagnostic struct {
 	GoVersion     string                  `json:"go_version"`
 	Goroutines    int                     `json:"goroutines"`
 	Build         RuntimeBuildDiagnostic  `json:"build"`
+	Diagnostics   RuntimeTimingDiagnostic `json:"diagnostics"`
 	Memory        RuntimeMemoryDiagnostic `json:"memory"`
 	SummaryCache  SummaryCacheDiagnostic  `json:"summary_cache"`
 	Store         StoreDiagnostic         `json:"store"`
@@ -388,6 +389,18 @@ type RuntimeDiagnostic struct {
 type RuntimeBuildDiagnostic struct {
 	Commit  string `json:"commit,omitempty"`
 	BuiltAt string `json:"built_at,omitempty"`
+}
+
+type RuntimeTimingDiagnostic struct {
+	TotalMS int64                    `json:"total_ms"`
+	Stages  []RuntimeStageDiagnostic `json:"stages"`
+}
+
+type RuntimeStageDiagnostic struct {
+	Name       string `json:"name"`
+	Status     Status `json:"status"`
+	DurationMS int64  `json:"duration_ms"`
+	Detail     string `json:"detail,omitempty"`
 }
 
 type RuntimeSettings struct {

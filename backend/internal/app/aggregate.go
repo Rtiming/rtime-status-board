@@ -430,10 +430,22 @@ func summarizeCheckHistory[T any](results []T, success func(T) bool, timestamp f
 }
 
 func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, error) {
-	generatedAt := time.Now().UTC()
+	diagnosticsStarted := time.Now()
+	generatedAt := diagnosticsStarted.UTC()
+	timing := RuntimeTimingDiagnostic{Stages: []RuntimeStageDiagnostic{}}
+	recordStage := func(name string, started time.Time, status Status, detail string) {
+		timing.Stages = append(timing.Stages, RuntimeStageDiagnostic{
+			Name:       name,
+			Status:     status,
+			DurationMS: time.Since(started).Milliseconds(),
+			Detail:     detail,
+		})
+	}
+
 	gatusStart := time.Now()
 	endpoints, gatusErr := a.gatus.EndpointStatuses(ctx)
 	gatusLatency := time.Since(gatusStart)
+	recordStage("gatus-endpoints", gatusStart, providerStatus(gatusErr == nil, len(endpoints) > 0), providerDetail(gatusErr, fmt.Sprintf("%d endpoints loaded", len(endpoints))))
 
 	checks := map[string]RuntimeCheck{}
 	if gatusErr == nil {
@@ -454,25 +466,43 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 	overall := aggregateOverall(projectStatuses(projects))
 	counts := countStatuses(services)
 
+	metricsStart := time.Now()
 	metrics, metricsErr := a.store.LatestMetrics(ctx)
+	recordStage("sqlite-latest-metrics", metricsStart, providerStatus(metricsErr == nil, true), providerDetail(metricsErr, fmt.Sprintf("%d metrics rows", len(metrics))))
 	metricsDiagnostic := a.metricsDiagnostic(metrics)
+	agentReportsStart := time.Now()
 	agentReports, agentReportsErr := a.store.RecentMetricReports(ctx, "", 20)
 	if agentReportsErr != nil {
 		agentReports = []MetricsReportLog{}
 	}
+	recordStage("sqlite-agent-reports", agentReportsStart, providerStatus(agentReportsErr == nil, true), providerDetail(agentReportsErr, fmt.Sprintf("%d report logs", len(agentReports))))
+	recentEventsStart := time.Now()
 	recentEvents, recentEventsErr := a.store.RecentEvents(ctx, 20)
 	if recentEventsErr != nil {
 		recentEvents = []Event{}
 	}
+	recordStage("sqlite-recent-events", recentEventsStart, providerStatus(recentEventsErr == nil, true), providerDetail(recentEventsErr, fmt.Sprintf("%d events", len(recentEvents))))
+	volatilityStart := time.Now()
 	statusVolatility, statusVolatilityErr := a.statusVolatilityDiagnostic(ctx, generatedAt)
+	recordStage("sqlite-status-volatility", volatilityStart, providerStatus(statusVolatilityErr == nil, true), providerDetail(statusVolatilityErr, fmt.Sprintf("%d volatile subjects", len(statusVolatility.Subjects))))
+	storeStart := time.Now()
 	storeDiagnostic, storeDiagnosticErr := a.storeDiagnostic(ctx)
+	recordStage("sqlite-store-diagnostics", storeStart, providerStatus(storeDiagnosticErr == nil, true), providerDetail(storeDiagnosticErr, fmt.Sprintf("%d event rows", storeDiagnostic.EventRows)))
 	issues := a.configIssues(endpoints, gatusErr)
 	failures := failingServices(services)
+	opsStart := time.Now()
 	ops := a.opsDiagnostic(generatedAt, services, metrics, metricsDiagnostic, issues, statusVolatility)
+	recordStage("ops-rollup", opsStart, StatusOK, fmt.Sprintf("%d ops issues", len(ops.Issues)))
+	deploymentStart := time.Now()
 	deployment := a.deploymentDiagnostic(storeDiagnostic)
+	recordStage("deployment-checks", deploymentStart, deployment.Status, fmt.Sprintf("%d deployment checks", len(deployment.Checks)))
+	projectDiagnosticsStart := time.Now()
 	projectDiagnostics := a.projectDiagnostics(projects, services, metricsDiagnostic, endpoints, recentEvents)
+	recordStage("project-diagnostics", projectDiagnosticsStart, StatusOK, fmt.Sprintf("%d project rows", len(projectDiagnostics)))
 	eventLog := eventLogDiagnostic(storeDiagnostic.EventRows, recentEvents)
+	agentHealthStart := time.Now()
 	agentHealth := agentReportDiagnostics(agentReports, metricsDiagnostic)
+	recordStage("agent-health-rollup", agentHealthStart, StatusOK, fmt.Sprintf("%d agent health rows", len(agentHealth)))
 	if storeDiagnosticErr != nil && eventLog.Total < eventLog.Returned {
 		eventLog.Total = eventLog.Returned
 	}
@@ -523,6 +553,8 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 		return endpoints[i].Group < endpoints[j].Group
 	})
 
+	timing.TotalMS = time.Since(diagnosticsStarted).Milliseconds()
+
 	return &DiagnosticsResponse{
 		GeneratedAt: generatedAt,
 		Overall:     overall,
@@ -536,7 +568,7 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 			Issues:             issues,
 		},
 		Metrics:      metricsDiagnostic,
-		Runtime:      a.runtimeDiagnostic(generatedAt, storeDiagnostic),
+		Runtime:      a.runtimeDiagnostic(generatedAt, storeDiagnostic, timing),
 		Deployment:   deployment,
 		Projects:     projectDiagnostics,
 		Ops:          ops,
@@ -1460,7 +1492,7 @@ func (a *Aggregator) storeDiagnostic(ctx context.Context) (StoreDiagnostic, erro
 	return a.store.Diagnostics(ctx)
 }
 
-func (a *Aggregator) runtimeDiagnostic(now time.Time, store StoreDiagnostic) RuntimeDiagnostic {
+func (a *Aggregator) runtimeDiagnostic(now time.Time, store StoreDiagnostic, diagnosticsTiming RuntimeTimingDiagnostic) RuntimeDiagnostic {
 	var mem runtime.MemStats
 	runtime.ReadMemStats(&mem)
 
@@ -1472,6 +1504,7 @@ func (a *Aggregator) runtimeDiagnostic(now time.Time, store StoreDiagnostic) Run
 			Commit:  strings.TrimSpace(a.runtime.BuildCommit),
 			BuiltAt: strings.TrimSpace(a.runtime.BuildTime),
 		},
+		Diagnostics: diagnosticsTiming,
 		Memory: RuntimeMemoryDiagnostic{
 			AllocBytes:     mem.Alloc,
 			SysBytes:       mem.Sys,

@@ -1646,6 +1646,21 @@ func TestDiagnosticsIncludesRuntimeStoreAndCache(t *testing.T) {
 	if diag.Runtime.Build.Commit != "abc1234" || diag.Runtime.Build.BuiltAt != "2026-06-10T06:00:00Z" {
 		t.Fatalf("runtime build = %#v, want configured build metadata", diag.Runtime.Build)
 	}
+	if diag.Runtime.Diagnostics.TotalMS < 0 || len(diag.Runtime.Diagnostics.Stages) == 0 {
+		t.Fatalf("runtime diagnostics timing = %#v, want total and stages", diag.Runtime.Diagnostics)
+	}
+	stageNames := map[string]bool{}
+	for _, stage := range diag.Runtime.Diagnostics.Stages {
+		stageNames[stage.Name] = true
+		if stage.DurationMS < 0 || stage.Status == "" {
+			t.Fatalf("runtime diagnostics stage = %#v, want status and non-negative duration", stage)
+		}
+	}
+	for _, want := range []string{"gatus-endpoints", "sqlite-latest-metrics", "sqlite-agent-reports", "sqlite-recent-events", "sqlite-status-volatility", "sqlite-store-diagnostics", "ops-rollup", "deployment-checks", "project-diagnostics", "agent-health-rollup"} {
+		if !stageNames[want] {
+			t.Fatalf("runtime diagnostics stages = %#v, missing %s", diag.Runtime.Diagnostics.Stages, want)
+		}
+	}
 	if !diag.Runtime.SummaryCache.Cached || diag.Runtime.SummaryCache.TTLSeconds != 10 || diag.Runtime.SummaryCache.SecondsUntilExpiry <= 0 {
 		t.Fatalf("summary cache = %#v, want warm cache with 10s ttl", diag.Runtime.SummaryCache)
 	}

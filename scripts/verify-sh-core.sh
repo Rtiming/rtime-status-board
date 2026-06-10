@@ -381,6 +381,21 @@ if expected_build_commit and expected_build_commit != "unknown" and build_diag.g
 if expected_build_time and expected_build_time != "unknown" and build_diag.get("built_at") != expected_build_time:
     raise SystemExit(f"runtime build time mismatch: diagnostics={build_diag.get('built_at')} env={expected_build_time}")
 
+runtime_timing = runtime_diag.get("diagnostics") or {}
+if runtime_timing.get("total_ms", -1) < 0:
+    raise SystemExit(f"runtime diagnostics timing has invalid total: {runtime_timing}")
+timing_stages = runtime_timing.get("stages") or []
+stage_names = {stage.get("name") for stage in timing_stages}
+for name in ("gatus-endpoints", "sqlite-latest-metrics", "sqlite-agent-reports", "sqlite-recent-events", "sqlite-status-volatility", "sqlite-store-diagnostics", "ops-rollup", "deployment-checks", "project-diagnostics", "agent-health-rollup"):
+    if name not in stage_names:
+        raise SystemExit(f"runtime diagnostics timing missing stage {name}: {timing_stages}")
+for stage in timing_stages:
+    for key in ("name", "status", "duration_ms", "detail"):
+        if key not in stage:
+            raise SystemExit(f"runtime diagnostics timing stage missing {key}: {stage}")
+    if stage.get("duration_ms", -1) < 0:
+        raise SystemExit(f"runtime diagnostics timing stage has invalid duration: {stage}")
+
 request_diag = runtime_diag.get("requests") or {}
 if request_diag.get("total", 0) < 1:
     raise SystemExit(f"runtime request diagnostics did not record prior API traffic: {request_diag}")
@@ -462,6 +477,7 @@ print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_na
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
 print(f"  API requests observed: {request_diag.get('total')} routes={len(request_diag.get('routes') or [])}")
 print(f"  build: {build_diag.get('commit')} {build_diag.get('built_at')}")
+print(f"  diagnostics timing: total={runtime_timing.get('total_ms')}ms stages={len(timing_stages)}")
 print(f"  status volatility rows: {len(volatility.get('subjects') or [])} threshold={volatility.get('change_threshold')}")
 
 failures = diagnostics.get("failures") or []

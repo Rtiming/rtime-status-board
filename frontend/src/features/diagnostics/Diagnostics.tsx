@@ -450,6 +450,8 @@ export function Diagnostics({
             <strong>{runtime.build?.commit || '-'}</strong>
             <span>{t.buildTime}</span>
             <strong>{runtime.build?.built_at ? formatTime(runtime.build.built_at) : '-'}</strong>
+            <span>{t.diagnosticsTotal}</span>
+            <strong>{formatLatencyMS(runtime.diagnostics?.total_ms ?? 0)}</strong>
             <span>{t.heap}</span>
             <strong>{formatBytes(runtime.memory.heap_alloc_bytes)}</strong>
             <span>{t.processMemory}</span>
@@ -495,6 +497,33 @@ export function Diagnostics({
               </>
             )}
           </div>
+          {runtime.diagnostics?.stages?.length > 0 && (
+            <>
+              <h3 className="panel-subtitle">{t.diagnosticsStages}</h3>
+              <div className="inline-table diagnostics-stage-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t.stage}</th>
+                      <th>{t.status}</th>
+                      <th>{t.duration}</th>
+                      <th>{t.detail}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {runtime.diagnostics.stages.map((stage) => (
+                      <tr key={stage.name}>
+                        <td><strong>{stage.name}</strong></td>
+                        <td><StatusPill status={stage.status} lang={lang} /></td>
+                        <td>{formatLatencyMS(stage.duration_ms)}</td>
+                        <td>{stage.detail || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
           {requests && requests.routes.length > 0 && (
             <>
               <h3 className="panel-subtitle">{t.apiRoutes}</h3>

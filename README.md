@@ -325,8 +325,11 @@ against the latest container snapshots. This keeps heavier services visible
 without adding another collector or polling loop.
 `/api/v1/diagnostics.runtime` exposes status-board self-diagnostics: process
 uptime, Go runtime memory, build commit/time, summary cache state, and SQLite
-size/row-count health. These values are read on demand from the current process,
-environment, and database; they do not add a background collector.
+size/row-count health. It also reports Diagnostics request stage timings for
+Gatus, SQLite reads, Ops rollups, deployment probes, and project/agent rollups,
+so slow debug requests can be isolated without opening container logs. These
+values are read on demand from the current process, environment, and database;
+they do not add a background collector.
 `/api/v1/diagnostics.deployment` exposes deployment-boundary checks for the
 status board itself: runtime mode, localhost bind address, Gatus URL, config
 path, SQLite data path, frontend artifact path, cache TTL, retention, and store

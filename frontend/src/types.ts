@@ -325,6 +325,7 @@ export interface RuntimeDiagnostic {
   go_version: string;
   goroutines: number;
   build: RuntimeBuildDiagnostic;
+  diagnostics: RuntimeTimingDiagnostic;
   memory: RuntimeMemoryDiagnostic;
   summary_cache: SummaryCacheDiagnostic;
   store: StoreDiagnostic;
@@ -334,6 +335,18 @@ export interface RuntimeDiagnostic {
 export interface RuntimeBuildDiagnostic {
   commit?: string;
   built_at?: string;
+}
+
+export interface RuntimeTimingDiagnostic {
+  total_ms: number;
+  stages: RuntimeStageDiagnostic[];
+}
+
+export interface RuntimeStageDiagnostic {
+  name: string;
+  status: Status;
+  duration_ms: number;
+  detail?: string;
 }
 
 export interface RuntimeMemoryDiagnostic {
