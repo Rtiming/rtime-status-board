@@ -381,10 +381,11 @@ endpoint names.
 reports, including receive time, schema version, collector OK/failure counts,
 GPU presence, and device counts. `/api/v1/diagnostics` includes the same recent
 report log plus `agent_health`, a per-node summary of recent report counts,
-collector failures, latest received/captured times, schema, lag, GPU presence,
-and latest failed collectors. This is assembled from the already-loaded bounded
-report log and metrics freshness data; it does not add another SQLite read or
-collector. The Nodes detail view also consumes the filtered report endpoint for
+collector failures, latest received/captured times, schema, lag, lag budget,
+lag headroom, GPU presence, and latest failed collectors. This is assembled
+from the already-loaded bounded report log and metrics freshness data; it does
+not add another SQLite read or collector. The Nodes detail view also consumes
+the filtered report endpoint for
 the selected node, so collector failures are visible without opening the global
 Diagnostics tab. The Projects detail view reuses the same bounded report log
 and filters it to related nodes, making project-level collector health visible

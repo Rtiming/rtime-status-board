@@ -256,9 +256,10 @@ querying a separate log system.
 `/api/v1/diagnostics.agent_health` is a per-node rollup over the same bounded
 report rows and latest metrics freshness data. Each row includes node status,
 recent report count, failed-report count, total collector failures, latest
-received/captured times, latest schema, latest collector OK/failure counts, GPU
-presence, device/interface counts, and latest failed collectors. It is meant for
-quick collector debugging and does not add another SQLite query or polling loop.
+received/captured times, latest report lag, report-lag warning budget and
+headroom, latest schema, latest collector OK/failure counts, GPU presence,
+device/interface counts, and latest failed collectors. It is meant for quick
+collector debugging and does not add another SQLite query or polling loop.
 
 ## Metrics Report v2
 

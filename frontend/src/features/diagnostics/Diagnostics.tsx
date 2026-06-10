@@ -578,7 +578,7 @@ export function Diagnostics({
                   <th>{t.reports}</th>
                   <th>{t.received}</th>
                   <th>{t.okFailed}</th>
-                  <th>{t.lag}</th>
+                  <th>{t.lagBudget}</th>
                   <th>{t.detail}</th>
                 </tr>
               </thead>
@@ -812,6 +812,14 @@ function formatServiceBudgetCPU(budget: ServiceResourceBudgetStatus, cpuLabel: s
   return `${usage} / ${budget.max_cpu_percent.toFixed(1)}% · ${remainingLabel} ${remaining}`;
 }
 
+function formatAgentReportLag(row: AgentNodeDiagnostic, remainingLabel: string) {
+  if (!row.latest_received_at) return '-';
+  const lag = formatSeconds(row.latest_report_lag_seconds);
+  if (!row.report_lag_warn_seconds) return lag;
+  const remaining = formatSignedOpsValue(row.report_lag_headroom_seconds ?? 0, 's');
+  return `${lag} / ${formatSeconds(row.report_lag_warn_seconds)} · ${remainingLabel} ${remaining}`;
+}
+
 function AgentHealthRow({ row, lang }: { row: AgentNodeDiagnostic; lang: Lang }) {
   const t = dictionary[lang];
   const failedCollectors = row.latest_failed_collectors ?? [];
@@ -836,7 +844,7 @@ function AgentHealthRow({ row, lang }: { row: AgentNodeDiagnostic; lang: Lang })
         <span>{t.schema}: {row.latest_schema_version ? `v${row.latest_schema_version}` : '-'}</span>
         <span>{t.gpu}: {row.gpu_available ? 'OK' : '-'}</span>
       </td>
-      <td>{row.latest_received_at ? formatSeconds(row.latest_report_lag_seconds) : '-'}</td>
+      <td>{formatAgentReportLag(row, t.remaining)}</td>
       <td>
         {row.detail}
         {failedCollectors.length > 0 && (

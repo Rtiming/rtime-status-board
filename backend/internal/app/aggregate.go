@@ -40,6 +40,7 @@ const (
 	statusVolatilityLimit           = 20
 	diagnosticsTotalWarnMS          = 1500
 	diagnosticsStageWarnMS          = 1000
+	agentReportLagWarnSeconds       = 30
 )
 
 func NewAggregator(config *AppConfig, store *Store, gatus *GatusClient, ttl time.Duration) *Aggregator {
@@ -619,6 +620,7 @@ func agentReportDiagnostics(reports []MetricsReportLog, metricsDiagnostic Metric
 			NodeID:                nodeID,
 			Status:                StatusOK,
 			Detail:                "recent agent reports are clean",
+			ReportLagWarnSeconds:  agentReportLagWarnSeconds,
 			ReportCount:           reportCount[nodeID],
 			FailedReportCount:     failedReportCount[nodeID],
 			CollectorFailureCount: collectorFailureCount[nodeID],
@@ -642,6 +644,7 @@ func agentReportDiagnostics(reports []MetricsReportLog, metricsDiagnostic Metric
 		diag.LatestReceivedAt = &latestReceived
 		diag.LatestCapturedAt = &latestCaptured
 		diag.LatestReportLagSeconds = latest.ReportLagSeconds
+		diag.ReportLagHeadroomSeconds = agentReportLagWarnSeconds - latest.ReportLagSeconds
 		diag.LatestSchemaVersion = latest.SchemaVersion
 		diag.LatestCollectorOK = latest.CollectorOK
 		diag.LatestCollectorFailed = latest.CollectorFailed
@@ -654,6 +657,10 @@ func agentReportDiagnostics(reports []MetricsReportLog, metricsDiagnostic Metric
 		if staleNodes[nodeID] {
 			diag.Status = StatusDegraded
 			details = append(details, "latest metrics are stale")
+		}
+		if latest.ReportLagSeconds > agentReportLagWarnSeconds {
+			diag.Status = StatusDegraded
+			details = append(details, fmt.Sprintf("latest report lag %.1fs exceeds %ds", latest.ReportLagSeconds, agentReportLagWarnSeconds))
 		}
 		if latest.CollectorFailed > 0 {
 			diag.Status = StatusDegraded

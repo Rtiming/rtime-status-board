@@ -486,6 +486,8 @@ export interface AgentNodeDiagnostic {
   latest_received_at?: string;
   latest_captured_at?: string;
   latest_report_lag_seconds: number;
+  report_lag_warn_seconds: number;
+  report_lag_headroom_seconds: number;
   latest_schema_version: number;
   latest_collector_ok: number;
   latest_collector_failed: number;

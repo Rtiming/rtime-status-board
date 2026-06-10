@@ -179,8 +179,9 @@ Current implementation status:
   presence, and device counts.
 - Diagnostics also exposes `agent_health`, a per-node rollup over those bounded
   report logs. It shows recent report counts, failed reports, collector failure
-  totals, latest received/captured times, schema, lag, GPU presence, and latest
-  failed collectors without adding another collector or polling loop.
+  totals, latest received/captured times, schema, lag, lag budget/headroom, GPU
+  presence, and latest failed collectors without adding another collector or
+  polling loop.
 - Project detail v1 is implemented in the Projects tab and through
   `GET /api/v1/projects/:id`; it shows related services, nodes, latest node
   metrics, failures, and recent relevant events.

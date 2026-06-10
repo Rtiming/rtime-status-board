@@ -468,23 +468,25 @@ type ProjectDiagnostic struct {
 }
 
 type AgentNodeDiagnostic struct {
-	NodeID                 string                  `json:"node_id"`
-	Hostname               string                  `json:"hostname,omitempty"`
-	Status                 Status                  `json:"status"`
-	Detail                 string                  `json:"detail"`
-	ReportCount            int                     `json:"report_count"`
-	FailedReportCount      int                     `json:"failed_report_count"`
-	CollectorFailureCount  int                     `json:"collector_failure_count"`
-	LatestReceivedAt       *time.Time              `json:"latest_received_at,omitempty"`
-	LatestCapturedAt       *time.Time              `json:"latest_captured_at,omitempty"`
-	LatestReportLagSeconds float64                 `json:"latest_report_lag_seconds"`
-	LatestSchemaVersion    int                     `json:"latest_schema_version"`
-	LatestCollectorOK      int                     `json:"latest_collector_ok"`
-	LatestCollectorFailed  int                     `json:"latest_collector_failed"`
-	GPUAvailable           bool                    `json:"gpu_available"`
-	StorageDeviceCount     int                     `json:"storage_device_count"`
-	NetworkInterfaceCount  int                     `json:"network_interface_count"`
-	LatestFailedCollectors []AgentCollectorFailure `json:"latest_failed_collectors,omitempty"`
+	NodeID                   string                  `json:"node_id"`
+	Hostname                 string                  `json:"hostname,omitempty"`
+	Status                   Status                  `json:"status"`
+	Detail                   string                  `json:"detail"`
+	ReportCount              int                     `json:"report_count"`
+	FailedReportCount        int                     `json:"failed_report_count"`
+	CollectorFailureCount    int                     `json:"collector_failure_count"`
+	LatestReceivedAt         *time.Time              `json:"latest_received_at,omitempty"`
+	LatestCapturedAt         *time.Time              `json:"latest_captured_at,omitempty"`
+	LatestReportLagSeconds   float64                 `json:"latest_report_lag_seconds"`
+	ReportLagWarnSeconds     float64                 `json:"report_lag_warn_seconds"`
+	ReportLagHeadroomSeconds float64                 `json:"report_lag_headroom_seconds"`
+	LatestSchemaVersion      int                     `json:"latest_schema_version"`
+	LatestCollectorOK        int                     `json:"latest_collector_ok"`
+	LatestCollectorFailed    int                     `json:"latest_collector_failed"`
+	GPUAvailable             bool                    `json:"gpu_available"`
+	StorageDeviceCount       int                     `json:"storage_device_count"`
+	NetworkInterfaceCount    int                     `json:"network_interface_count"`
+	LatestFailedCollectors   []AgentCollectorFailure `json:"latest_failed_collectors,omitempty"`
 }
 
 type AgentCollectorFailure struct {

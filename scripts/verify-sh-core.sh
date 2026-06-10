@@ -439,6 +439,7 @@ if schema.get("version") != 2:
     raise SystemExit(f"telemetry schema version = {schema.get('version')}, want 2")
 
 metric_diag = diagnostics.get("metrics", {})
+agent_health = diagnostics.get("agent_health") or []
 missing = metric_diag.get("missing_nodes") or []
 stale = metric_diag.get("stale_nodes") or []
 collector_issues = metric_diag.get("collector_issues") or []
@@ -499,6 +500,19 @@ for item in metrics:
         raise SystemExit(f"{item.get('node_id')} missing collector statuses: {missing_status}")
     cache_hits += sum(1 for name in heavy_names if statuses[name].get("cached") is True)
 
+if len(agent_health) != EXPECTED_NODE_COUNT:
+    raise SystemExit(f"agent health rows = {len(agent_health)}, want {EXPECTED_NODE_COUNT}: {agent_health}")
+for row in agent_health:
+    for key in ("node_id", "status", "report_count", "latest_report_lag_seconds", "report_lag_warn_seconds", "report_lag_headroom_seconds", "detail"):
+        if key not in row:
+            raise SystemExit(f"agent health row missing {key}: {row}")
+    if row.get("status") != "ok":
+        raise SystemExit(f"agent health row is not ok: {row}")
+    if row.get("report_lag_warn_seconds", 0) < 1:
+        raise SystemExit(f"agent health row has invalid lag budget: {row}")
+    if row.get("report_lag_headroom_seconds", 0) <= 0:
+        raise SystemExit(f"agent health row has no positive lag headroom: {row}")
+
 print(f"  diagnostics overall: {diagnostics.get('overall')}")
 print(f"  reporting nodes: {len(metric_diag.get('reporting_nodes') or [])}/{len(metric_diag.get('expected_nodes') or [])}")
 print(f"  metrics nodes: {len(metrics)}")
@@ -506,6 +520,7 @@ print(f"  collector summaries: {len(collector_summary)}")
 print(f"  service resource budgets: {len(service_resource_budgets)}")
 print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_names)}")
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
+print(f"  agent health rows: {len(agent_health)}")
 print(f"  API requests observed: {request_diag.get('total')} routes={len(request_diag.get('routes') or [])}")
 print(f"  build: {build_diag.get('commit')} {build_diag.get('built_at')}")
 print(f"  diagnostics timing: total={runtime_timing.get('total_ms')}ms total_budget={runtime_timing.get('total_warn_ms')}ms stage_budget={runtime_timing.get('stage_warn_ms')}ms stages={len(timing_stages)}")

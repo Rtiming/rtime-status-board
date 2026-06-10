@@ -1949,6 +1949,9 @@ func TestAgentReportDiagnosticsSummarizesRecentCollectorHealth(t *testing.T) {
 	if nodeA.LatestCollectorFailed != 0 || nodeA.LatestReceivedAt == nil || !nodeA.LatestReceivedAt.Equal(base) {
 		t.Fatalf("node-a latest = %#v, want newest clean report at %s", nodeA, base)
 	}
+	if nodeA.ReportLagWarnSeconds != agentReportLagWarnSeconds || nodeA.ReportLagHeadroomSeconds != 20 {
+		t.Fatalf("node-a lag budget = %#v, want 30s budget and 20s headroom", nodeA)
+	}
 
 	nodeB := byNode["node-b"]
 	if nodeB.Status != StatusDegraded || nodeB.LatestCollectorFailed != 2 || len(nodeB.LatestFailedCollectors) != 1 {
@@ -1961,6 +1964,34 @@ func TestAgentReportDiagnosticsSummarizesRecentCollectorHealth(t *testing.T) {
 	nodeC := byNode["node-c"]
 	if nodeC.Status != StatusUnknown || nodeC.ReportCount != 0 || !strings.Contains(nodeC.Detail, "no recent metrics report") {
 		t.Fatalf("node-c summary = %#v, want unknown missing report", nodeC)
+	}
+}
+
+func TestAgentReportDiagnosticsFlagsSlowReportLag(t *testing.T) {
+	base := time.Date(2026, 6, 10, 8, 7, 0, 0, time.UTC)
+	diag := agentReportDiagnostics([]MetricsReportLog{
+		{
+			ID:               1,
+			NodeID:           "node-a",
+			Hostname:         "node-a-host",
+			SchemaVersion:    2,
+			CapturedAt:       base.Add(-31 * time.Second),
+			ReceivedAt:       base,
+			ReportLagSeconds: 31,
+			CollectorOK:      3,
+			CollectorFailed:  0,
+		},
+	}, MetricsDiagnostic{ExpectedNodes: []string{"node-a"}})
+
+	if len(diag) != 1 {
+		t.Fatalf("agent diagnostics = %#v, want one node", diag)
+	}
+	row := diag[0]
+	if row.Status != StatusDegraded || row.ReportLagWarnSeconds != agentReportLagWarnSeconds || row.ReportLagHeadroomSeconds != -1 {
+		t.Fatalf("agent diagnostics = %#v, want degraded slow report lag", row)
+	}
+	if !strings.Contains(row.Detail, "latest report lag 31.0s exceeds 30s") {
+		t.Fatalf("detail = %q, want slow report lag detail", row.Detail)
 	}
 }
 
