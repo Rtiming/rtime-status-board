@@ -369,6 +369,53 @@ func TestMetricsDiagnosticServiceResourceBudgets(t *testing.T) {
 	}
 }
 
+func TestMetricsDiagnosticCollectorSummary(t *testing.T) {
+	cfg := AppConfig{
+		App: AppMeta{Name: "test"},
+		Nodes: []NodeConfig{
+			{ID: "node-a", Name: "node-a"},
+			{ID: "node-b", Name: "node-b"},
+			{ID: "node-c", Name: "node-c"},
+		},
+	}
+	aggregator := NewAggregator(&cfg, nil, nil, 0)
+	diag := aggregator.metricsDiagnostic([]MetricsView{
+		{
+			MetricsReport: MetricsReport{NodeID: "node-a"},
+			CollectorStatus: []CollectorStatus{
+				{Name: "cpu", OK: true, ElapsedMS: 10},
+				{Name: "gpu", OK: false, Detail: "nvidia-smi timeout", ElapsedMS: 20, Cached: true, CacheAgeSeconds: 61},
+			},
+		},
+		{
+			MetricsReport: MetricsReport{NodeID: "node-b"},
+			CollectorStatus: []CollectorStatus{
+				{Name: "cpu", OK: true, ElapsedMS: 30},
+				{Name: "containers", OK: true, ElapsedMS: 5, Cached: true, CacheAgeSeconds: 120},
+			},
+		},
+	})
+
+	byName := map[string]MetricsCollectorSummary{}
+	for _, row := range diag.CollectorSummary {
+		byName[row.Name] = row
+	}
+	cpu := byName["cpu"]
+	if cpu.Status != StatusOK || cpu.ReportingNodes != 2 || cpu.ObservedNodes != 2 || cpu.OKNodes != 2 || cpu.AvgElapsedMS != 20 || cpu.MaxElapsedMS != 30 {
+		t.Fatalf("cpu summary = %#v, want healthy coverage across two reporting nodes", cpu)
+	}
+	gpu := byName["gpu"]
+	if gpu.Status != StatusDegraded || gpu.ObservedNodes != 1 || gpu.FailedNodes != 1 || len(gpu.MissingNodes) != 1 || gpu.MissingNodes[0] != "node-b" ||
+		len(gpu.FailedNodeIDs) != 1 || gpu.FailedNodeIDs[0] != "node-a" || gpu.CachedNodes != 1 || gpu.MaxCacheAgeSeconds != 61 {
+		t.Fatalf("gpu summary = %#v, want failure, missing node-b, and cached node-a", gpu)
+	}
+	containers := byName["containers"]
+	if containers.Status != StatusDegraded || containers.ObservedNodes != 1 || len(containers.MissingNodes) != 1 || containers.MissingNodes[0] != "node-a" ||
+		containers.CachedNodes != 1 || containers.MaxCacheAgeSeconds != 120 {
+		t.Fatalf("containers summary = %#v, want missing node-a and cached node-b", containers)
+	}
+}
+
 func TestMetricsDiagnosticServiceResourceBudgetIssues(t *testing.T) {
 	cfg := AppConfig{
 		App:   AppMeta{Name: "test"},

@@ -317,6 +317,7 @@ type MetricsDiagnostic struct {
 	StaleNodes             []string                      `json:"stale_nodes"`
 	GPUNodes               []string                      `json:"gpu_nodes"`
 	CollectorIssues        []MetricsCollectorIssue       `json:"collector_issues"`
+	CollectorSummary       []MetricsCollectorSummary     `json:"collector_summary"`
 	ServiceResourceBudgets []ServiceResourceBudgetStatus `json:"service_resource_budgets"`
 	ServiceResourceIssues  []ServiceResourceIssue        `json:"service_resource_issues"`
 }
@@ -326,6 +327,23 @@ type MetricsCollectorIssue struct {
 	Name      string `json:"name"`
 	Detail    string `json:"detail,omitempty"`
 	ElapsedMS int64  `json:"elapsed_ms,omitempty"`
+}
+
+type MetricsCollectorSummary struct {
+	Name               string   `json:"name"`
+	Status             Status   `json:"status"`
+	ReportingNodes     int      `json:"reporting_nodes"`
+	ObservedNodes      int      `json:"observed_nodes"`
+	OKNodes            int      `json:"ok_nodes"`
+	FailedNodes        int      `json:"failed_nodes"`
+	CachedNodes        int      `json:"cached_nodes"`
+	MissingNodes       []string `json:"missing_nodes,omitempty"`
+	FailedNodeIDs      []string `json:"failed_node_ids,omitempty"`
+	CachedNodeIDs      []string `json:"cached_node_ids,omitempty"`
+	AvgElapsedMS       float64  `json:"avg_elapsed_ms"`
+	MaxElapsedMS       int64    `json:"max_elapsed_ms"`
+	MaxCacheAgeSeconds float64  `json:"max_cache_age_seconds"`
+	Detail             string   `json:"detail"`
 }
 
 type ServiceResourceBudgetStatus struct {

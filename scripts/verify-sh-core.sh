@@ -314,12 +314,23 @@ metric_diag = diagnostics.get("metrics", {})
 missing = metric_diag.get("missing_nodes") or []
 stale = metric_diag.get("stale_nodes") or []
 collector_issues = metric_diag.get("collector_issues") or []
+collector_summary = metric_diag.get("collector_summary") or []
 if missing:
     raise SystemExit(f"missing metrics nodes: {missing}")
 if stale:
     raise SystemExit(f"stale metrics nodes: {stale}")
 if collector_issues:
     raise SystemExit(f"collector issues: {collector_issues}")
+summary_by_name = {row.get("name"): row for row in collector_summary}
+for name in ("gpu", "containers", "processes"):
+    row = summary_by_name.get(name)
+    if not row:
+        raise SystemExit(f"collector summary missing {name}: {collector_summary}")
+    for key in ("status", "reporting_nodes", "observed_nodes", "ok_nodes", "failed_nodes", "cached_nodes", "avg_elapsed_ms", "max_elapsed_ms"):
+        if key not in row:
+            raise SystemExit(f"collector summary {name} missing {key}: {row}")
+    if row.get("status") != "ok":
+        raise SystemExit(f"collector summary {name} is not ok: {row}")
 
 if len(metrics) != EXPECTED_NODE_COUNT:
     raise SystemExit(f"metrics node count = {len(metrics)}, want {EXPECTED_NODE_COUNT}")
@@ -338,6 +349,7 @@ for item in metrics:
 print(f"  diagnostics overall: {diagnostics.get('overall')}")
 print(f"  reporting nodes: {len(metric_diag.get('reporting_nodes') or [])}/{len(metric_diag.get('expected_nodes') or [])}")
 print(f"  metrics nodes: {len(metrics)}")
+print(f"  collector summaries: {len(collector_summary)}")
 print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_names)}")
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
 

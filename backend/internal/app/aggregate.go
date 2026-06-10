@@ -1971,6 +1971,7 @@ func (a *Aggregator) metricsDiagnostic(metrics []MetricsView) MetricsDiagnostic 
 		}
 		return collectorIssues[i].NodeID < collectorIssues[j].NodeID
 	})
+	collectorSummary := metricsCollectorSummary(metrics, reporting)
 	return MetricsDiagnostic{
 		ExpectedNodes:          expected,
 		ReportingNodes:         reporting,
@@ -1978,9 +1979,89 @@ func (a *Aggregator) metricsDiagnostic(metrics []MetricsView) MetricsDiagnostic 
 		StaleNodes:             stale,
 		GPUNodes:               gpuNodes,
 		CollectorIssues:        collectorIssues,
+		CollectorSummary:       collectorSummary,
 		ServiceResourceBudgets: serviceResourceBudgets,
 		ServiceResourceIssues:  serviceResourceIssues,
 	}
+}
+
+func metricsCollectorSummary(metrics []MetricsView, reportingNodes []string) []MetricsCollectorSummary {
+	collectorNames := map[string]bool{}
+	statusesByNode := map[string]map[string]CollectorStatus{}
+	for _, metric := range metrics {
+		if statusesByNode[metric.NodeID] == nil {
+			statusesByNode[metric.NodeID] = map[string]CollectorStatus{}
+		}
+		for _, collector := range metric.CollectorStatus {
+			if collector.Name == "" {
+				continue
+			}
+			collectorNames[collector.Name] = true
+			statusesByNode[metric.NodeID][collector.Name] = collector
+		}
+	}
+	names := sortedKeys(collectorNames)
+	summaries := make([]MetricsCollectorSummary, 0, len(names))
+	for _, name := range names {
+		summary := MetricsCollectorSummary{
+			Name:           name,
+			Status:         StatusOK,
+			ReportingNodes: len(reportingNodes),
+			Detail:         "collector is healthy across reporting nodes",
+		}
+		var elapsedTotal int64
+		var elapsedCount int
+		for _, nodeID := range reportingNodes {
+			collector, ok := statusesByNode[nodeID][name]
+			if !ok {
+				summary.MissingNodes = append(summary.MissingNodes, nodeID)
+				continue
+			}
+			summary.ObservedNodes++
+			elapsedTotal += collector.ElapsedMS
+			elapsedCount++
+			if collector.ElapsedMS > summary.MaxElapsedMS {
+				summary.MaxElapsedMS = collector.ElapsedMS
+			}
+			if collector.OK {
+				summary.OKNodes++
+			} else {
+				summary.FailedNodes++
+				summary.FailedNodeIDs = append(summary.FailedNodeIDs, nodeID)
+			}
+			if collector.Cached {
+				summary.CachedNodes++
+				summary.CachedNodeIDs = append(summary.CachedNodeIDs, nodeID)
+				if collector.CacheAgeSeconds > summary.MaxCacheAgeSeconds {
+					summary.MaxCacheAgeSeconds = collector.CacheAgeSeconds
+				}
+			}
+		}
+		sort.Strings(summary.MissingNodes)
+		sort.Strings(summary.FailedNodeIDs)
+		sort.Strings(summary.CachedNodeIDs)
+		if elapsedCount > 0 {
+			summary.AvgElapsedMS = float64(elapsedTotal) / float64(elapsedCount)
+		}
+		if summary.FailedNodes > 0 || len(summary.MissingNodes) > 0 {
+			summary.Status = StatusDegraded
+			parts := []string{}
+			if summary.FailedNodes > 0 {
+				parts = append(parts, fmt.Sprintf("%d failed", summary.FailedNodes))
+			}
+			if len(summary.MissingNodes) > 0 {
+				parts = append(parts, fmt.Sprintf("%d missing", len(summary.MissingNodes)))
+			}
+			if summary.CachedNodes > 0 {
+				parts = append(parts, fmt.Sprintf("%d cached", summary.CachedNodes))
+			}
+			summary.Detail = strings.Join(parts, "; ")
+		} else if summary.CachedNodes > 0 {
+			summary.Detail = fmt.Sprintf("collector is healthy; %d nodes used cached data", summary.CachedNodes)
+		}
+		summaries = append(summaries, summary)
+	}
+	return summaries
 }
 
 func (a *Aggregator) serviceResourceBudgetStatuses(metrics []MetricsView) ([]ServiceResourceBudgetStatus, []ServiceResourceIssue) {

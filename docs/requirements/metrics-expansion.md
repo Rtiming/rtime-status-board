@@ -109,6 +109,10 @@ Current implementation status:
 - Diagnostics now exposes GPU-reporting nodes and metrics collector issues, so
   failed CPU/IO/GPU/container/process reads are visible from the board before
   opening remote logs.
+- Diagnostics now also exposes a per-collector coverage matrix from latest
+  agent reports. It shows observed, OK, failed, cached, and missing nodes plus
+  elapsed/cache-age summaries for each reported collector, so old agents or
+  partially failing collectors are visible without adding another polling loop.
 - Diagnostics now evaluates optional service resource budgets from static
   config against latest Docker container snapshots. This keeps heavy services
   such as Khoj visible without adding a new collector or long-retention metrics

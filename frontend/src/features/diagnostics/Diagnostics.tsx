@@ -35,6 +35,7 @@ export function Diagnostics({
 
   const serviceResourceBudgets = diagnostics.metrics.service_resource_budgets ?? [];
   const serviceResourceIssues = diagnostics.metrics.service_resource_issues ?? [];
+  const collectorSummary = diagnostics.metrics.collector_summary ?? [];
   const runtime = diagnostics.runtime;
   const store = runtime?.store;
   const deployment = diagnostics.deployment;
@@ -442,6 +443,49 @@ export function Diagnostics({
               </div>
             ))}
           </div>
+        )}
+        {collectorSummary.length > 0 && (
+          <>
+            <h3 className="panel-subtitle">{t.collectorCoverage}</h3>
+            <div className="inline-table collector-summary-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t.collectors}</th>
+                    <th>{t.status}</th>
+                    <th>{t.observed}</th>
+                    <th>{t.okFailed}</th>
+                    <th>{t.cached}</th>
+                    <th>{t.missing}</th>
+                    <th>{t.avgElapsed}</th>
+                    <th>{t.maxElapsed}</th>
+                    <th>{t.maxCacheAge}</th>
+                    <th>{t.detail}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {collectorSummary.map((collector) => (
+                    <tr key={collector.name}>
+                      <td><strong>{collector.name}</strong></td>
+                      <td><StatusPill status={collector.status} lang={lang} /></td>
+                      <td>{collector.observed_nodes}/{collector.reporting_nodes}</td>
+                      <td>{collector.ok_nodes}/{collector.failed_nodes}</td>
+                      <td>{collector.cached_nodes}</td>
+                      <td>{formatList(collector.missing_nodes)}</td>
+                      <td>{formatSeconds((collector.avg_elapsed_ms ?? 0) / 1000)}</td>
+                      <td>{formatSeconds((collector.max_elapsed_ms ?? 0) / 1000)}</td>
+                      <td>{collector.max_cache_age_seconds > 0 ? formatSeconds(collector.max_cache_age_seconds) : '-'}</td>
+                      <td>
+                        {collector.detail || '-'}
+                        {(collector.failed_node_ids?.length ?? 0) > 0 && <span>{t.failedNodes}: {formatList(collector.failed_node_ids)}</span>}
+                        {(collector.cached_node_ids?.length ?? 0) > 0 && <span>{t.cachedNodes}: {formatList(collector.cached_node_ids)}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         {serviceResourceBudgets.length > 0 && (
           <div className="issue-list">

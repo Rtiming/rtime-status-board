@@ -263,6 +263,7 @@ export interface MetricsDiagnostic {
   stale_nodes: string[];
   gpu_nodes: string[];
   collector_issues: MetricsCollectorIssue[];
+  collector_summary: MetricsCollectorSummary[];
   service_resource_budgets: ServiceResourceBudgetStatus[];
   service_resource_issues: ServiceResourceIssue[];
 }
@@ -272,6 +273,23 @@ export interface MetricsCollectorIssue {
   name: string;
   detail?: string;
   elapsed_ms?: number;
+}
+
+export interface MetricsCollectorSummary {
+  name: string;
+  status: Status;
+  reporting_nodes: number;
+  observed_nodes: number;
+  ok_nodes: number;
+  failed_nodes: number;
+  cached_nodes: number;
+  missing_nodes?: string[];
+  failed_node_ids?: string[];
+  cached_node_ids?: string[];
+  avg_elapsed_ms: number;
+  max_elapsed_ms: number;
+  max_cache_age_seconds: number;
+  detail: string;
 }
 
 export interface ServiceResourceBudgetStatus {

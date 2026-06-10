@@ -121,7 +121,12 @@ throughput, storage IOPS, and GPU utilization points instead of
 high-cardinality process rows.
 `/api/v1/diagnostics.metrics` also includes `gpu_nodes` and
 `collector_issues` for quick read-failure diagnosis, including container or
-process collector failures.
+process collector failures. It also includes `collector_summary`, a per-
+collector coverage matrix derived from latest agent reports. Each row shows the
+collector name, status, reporting/observed node counts, OK/failed/cached node
+counts, missing/failed/cached node IDs, average/max elapsed time, and max cache
+age. This is a read-only aggregation over already-stored latest metrics and does
+not add a collector or polling loop.
 
 `/api/v1/diagnostics.metrics.service_resource_budgets` evaluates optional
 service-level budgets from static config against the latest container snapshot.

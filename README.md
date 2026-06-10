@@ -143,8 +143,8 @@ production directory hygiene, remote tree size, Compose config, running
 containers, status-board container resource budget, expected listening ports,
 Tailnet Nginx health, public Nginx Basic Auth boundaries, health endpoint,
 telemetry schema, metrics agent freshness, collector issues, recent agent
-reports, all node/project/service detail endpoints, and bounded node/project/
-service check-log endpoints. It also runs `rtime-doctor` by default. To skip
+reports, per-collector coverage, all node/project/service detail endpoints, and
+bounded node/project/service check-log endpoints. It also runs `rtime-doctor` by default. To skip
 the broader rtime network doctor during a quick status-board check:
 
 ```bash
@@ -227,7 +227,8 @@ domain.
 `/api/v1/checks` exposes normalized Gatus endpoint results, including recent
 failure counts, failed conditions, and raw error messages. `/api/v1/diagnostics`
 is the reserved debug surface for future tuning: provider health, static config
-mapping issues, metrics agent freshness, failing services, and raw checks.
+mapping issues, metrics agent freshness, per-collector coverage, failing
+services, and raw checks.
 Node, project, and service check-log APIs also return a `summary` object over
 the bounded rows, including failure counts, failure percentage, average/p95/max
 latency, and latest failure time.

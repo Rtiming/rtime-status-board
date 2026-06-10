@@ -740,6 +740,10 @@ td span,
   min-width: 980px;
 }
 
+.collector-summary-table table {
+  min-width: 1100px;
+}
+
 .panel-subtitle {
   margin: 18px 0 8px;
   color: #50606f;
