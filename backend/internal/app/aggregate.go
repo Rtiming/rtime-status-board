@@ -980,9 +980,151 @@ func (a *Aggregator) opsDiagnostic(now time.Time, services []ServiceView, metric
 	return OpsDiagnostic{
 		Issues:             issues,
 		Counts:             countOpsIssues(issues),
+		ProjectImpacts:     a.projectImpacts(issues),
 		ResourceThresholds: a.resourceThresholdViews(metricsDiagnostic.ExpectedNodes),
 		ResourceStates:     a.resourceStates(now, metrics),
 	}
+}
+
+func (a *Aggregator) projectImpacts(issues []OpsIssue) []OpsProjectImpact {
+	if len(issues) == 0 {
+		return []OpsProjectImpact{}
+	}
+
+	projectNames := map[string]string{}
+	for _, project := range a.config.Projects {
+		projectNames[project.ID] = project.Name
+	}
+
+	serviceProjects := map[string]map[string]bool{}
+	nodeProjects := map[string]map[string]bool{}
+	for _, project := range a.config.Projects {
+		for _, serviceID := range project.ServiceIDs {
+			addSetValue(serviceProjects, serviceID, project.ID)
+		}
+	}
+	for _, service := range a.config.Services {
+		if service.ProjectID != "" {
+			addSetValue(serviceProjects, service.ID, service.ProjectID)
+		}
+		for projectID := range serviceProjects[service.ID] {
+			if service.NodeID != "" {
+				addSetValue(nodeProjects, service.NodeID, projectID)
+			}
+		}
+	}
+
+	type impactAccumulator struct {
+		impact   OpsProjectImpact
+		nodes    map[string]bool
+		services map[string]bool
+		kinds    map[string]bool
+	}
+	impacts := map[string]*impactAccumulator{}
+	ensure := func(projectID string) *impactAccumulator {
+		acc := impacts[projectID]
+		if acc == nil {
+			name := projectNames[projectID]
+			if name == "" {
+				name = projectID
+			}
+			acc = &impactAccumulator{
+				impact: OpsProjectImpact{
+					ProjectID:   projectID,
+					ProjectName: name,
+					Status:      StatusOK,
+				},
+				nodes:    map[string]bool{},
+				services: map[string]bool{},
+				kinds:    map[string]bool{},
+			}
+			impacts[projectID] = acc
+		}
+		return acc
+	}
+
+	for _, issue := range issues {
+		projectIDs := map[string]bool{}
+		if issue.ProjectID != "" {
+			projectIDs[issue.ProjectID] = true
+		}
+		if issue.ServiceID != "" {
+			for projectID := range serviceProjects[issue.ServiceID] {
+				projectIDs[projectID] = true
+			}
+		}
+		if issue.NodeID != "" {
+			for projectID := range nodeProjects[issue.NodeID] {
+				projectIDs[projectID] = true
+			}
+		}
+		for projectID := range projectIDs {
+			acc := ensure(projectID)
+			acc.impact.IssueCount++
+			switch issue.Severity {
+			case "error":
+				acc.impact.ErrorCount++
+			case "warn":
+				acc.impact.WarnCount++
+			default:
+				acc.impact.InfoCount++
+			}
+			if issue.NodeID != "" {
+				acc.nodes[issue.NodeID] = true
+			}
+			if issue.ServiceID != "" {
+				acc.services[issue.ServiceID] = true
+			}
+			if issue.Kind != "" {
+				acc.kinds[issue.Kind] = true
+			}
+		}
+	}
+
+	rows := make([]OpsProjectImpact, 0, len(impacts))
+	for _, acc := range impacts {
+		row := acc.impact
+		row.AffectedNodes = sortedKeys(acc.nodes)
+		row.AffectedServices = sortedKeys(acc.services)
+		row.IssueKinds = sortedKeys(acc.kinds)
+		row.Status = StatusOK
+		if row.ErrorCount > 0 {
+			row.Status = StatusDown
+		} else if row.WarnCount > 0 || row.InfoCount > 0 {
+			row.Status = StatusDegraded
+		}
+		row.Detail = fmt.Sprintf("%d issues across %d kinds", row.IssueCount, len(row.IssueKinds))
+		rows = append(rows, row)
+	}
+
+	sort.Slice(rows, func(i, j int) bool {
+		if rows[i].ErrorCount == rows[j].ErrorCount {
+			if rows[i].WarnCount == rows[j].WarnCount {
+				if rows[i].IssueCount == rows[j].IssueCount {
+					return rows[i].ProjectID < rows[j].ProjectID
+				}
+				return rows[i].IssueCount > rows[j].IssueCount
+			}
+			return rows[i].WarnCount > rows[j].WarnCount
+		}
+		return rows[i].ErrorCount > rows[j].ErrorCount
+	})
+	if len(rows) > 20 {
+		rows = rows[:20]
+	}
+	return rows
+}
+
+func addSetValue(values map[string]map[string]bool, key string, value string) {
+	if key == "" || value == "" {
+		return
+	}
+	set := values[key]
+	if set == nil {
+		set = map[string]bool{}
+		values[key] = set
+	}
+	set[value] = true
 }
 
 func resourceThresholdIssues(metric MetricsView, now time.Time, thresholds EffectiveResourceThreshold) []OpsIssue {

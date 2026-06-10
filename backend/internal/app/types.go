@@ -548,6 +548,7 @@ type APIRequestRouteDiagnostic struct {
 type OpsDiagnostic struct {
 	Issues             []OpsIssue                   `json:"issues"`
 	Counts             OpsIssueCounts               `json:"counts"`
+	ProjectImpacts     []OpsProjectImpact           `json:"project_impacts"`
 	ResourceThresholds []EffectiveResourceThreshold `json:"resource_thresholds"`
 	ResourceStates     []OpsResourceState           `json:"resource_states"`
 }
@@ -573,6 +574,20 @@ type OpsIssue struct {
 	Unit        string    `json:"unit,omitempty"`
 	Detail      string    `json:"detail"`
 	ObservedAt  time.Time `json:"observed_at,omitempty"`
+}
+
+type OpsProjectImpact struct {
+	ProjectID        string   `json:"project_id"`
+	ProjectName      string   `json:"project_name"`
+	Status           Status   `json:"status"`
+	IssueCount       int      `json:"issue_count"`
+	ErrorCount       int      `json:"error_count"`
+	WarnCount        int      `json:"warn_count"`
+	InfoCount        int      `json:"info_count"`
+	AffectedNodes    []string `json:"affected_nodes,omitempty"`
+	AffectedServices []string `json:"affected_services,omitempty"`
+	IssueKinds       []string `json:"issue_kinds,omitempty"`
+	Detail           string   `json:"detail"`
 }
 
 type EffectiveResourceThreshold struct {

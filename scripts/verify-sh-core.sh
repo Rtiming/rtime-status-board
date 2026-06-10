@@ -344,6 +344,13 @@ if "GET /api/v1/health" not in route_keys:
 runtime_api_issues = [issue for issue in ((diagnostics.get("ops") or {}).get("issues") or []) if issue.get("kind") == "runtime-api"]
 if runtime_api_issues:
     raise SystemExit(f"runtime API request issues in healthy verification path: {runtime_api_issues}")
+ops_diag = diagnostics.get("ops") or {}
+if "project_impacts" not in ops_diag:
+    raise SystemExit(f"ops diagnostics missing project_impacts: {ops_diag}")
+for impact in ops_diag.get("project_impacts") or []:
+    for key in ("project_id", "project_name", "status", "issue_count", "error_count", "warn_count", "info_count", "detail"):
+        if key not in impact:
+            raise SystemExit(f"ops project impact missing {key}: {impact}")
 
 if schema.get("version") != 2:
     raise SystemExit(f"telemetry schema version = {schema.get('version')}, want 2")

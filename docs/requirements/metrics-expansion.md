@@ -149,7 +149,9 @@ Current implementation status:
   quick triage. The digest also exposes effective per-node resource thresholds
   and current/limit/headroom rows for CPU, memory, disk, GPU, network rate, and
   storage IO rate so alert tuning and remaining capacity are visible from the
-  board itself.
+  board itself. The same digest now includes project impact rollups with
+  severity counts, affected nodes/services, and issue kinds for project-level
+  troubleshooting without extra collectors.
 - Diagnostics now includes a bounded status-change event log from SQLite, so
   recent service/node/project transitions are visible beside coverage and ops
   checks without adding a collector or a second log store.

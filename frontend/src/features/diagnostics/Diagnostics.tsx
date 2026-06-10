@@ -43,6 +43,7 @@ export function Diagnostics({
   const projectDiagnostics = diagnostics.projects ?? [];
   const opsIssues = diagnostics.ops?.issues ?? [];
   const opsCounts = diagnostics.ops?.counts ?? { error: 0, warn: 0, info: 0 };
+  const projectImpacts = diagnostics.ops?.project_impacts ?? [];
   const resourceThresholds = diagnostics.ops?.resource_thresholds ?? [];
   const resourceStates = diagnostics.ops?.resource_states ?? [];
   const eventLog = diagnostics.event_log;
@@ -245,6 +246,46 @@ export function Diagnostics({
           <span>{t.issueInfo}</span>
           <strong>{opsCounts.info ? String(opsCounts.info) : '-'}</strong>
         </div>
+        {projectImpacts.length > 0 && (
+          <>
+            <h3 className="panel-subtitle">{t.projectImpacts}</h3>
+            <div className="inline-table project-impact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t.project}</th>
+                    <th>{t.status}</th>
+                    <th>{t.opsIssues}</th>
+                    <th>{t.affected}</th>
+                    <th>{t.issueKinds}</th>
+                    <th>{t.detail}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {projectImpacts.map((impact) => (
+                    <tr key={impact.project_id}>
+                      <td>
+                        <strong>{impact.project_name}</strong>
+                        <span>{impact.project_id}</span>
+                      </td>
+                      <td><StatusPill status={impact.status} lang={lang} /></td>
+                      <td>
+                        <strong>{impact.issue_count}</strong>
+                        <span>{t.issueError}: {impact.error_count} · {t.issueWarn}: {impact.warn_count} · {t.issueInfo}: {impact.info_count}</span>
+                      </td>
+                      <td>
+                        <span>{t.node}: {formatList(impact.affected_nodes)}</span>
+                        <span>{t.service}: {formatList(impact.affected_services)}</span>
+                      </td>
+                      <td>{formatList(impact.issue_kinds)}</td>
+                      <td>{impact.detail}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
         {opsIssues.length === 0 ? (
           <div className="empty inline-empty">{t.noOpsIssues}</div>
         ) : (

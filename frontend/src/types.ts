@@ -479,6 +479,7 @@ export interface AgentCollectorFailure {
 export interface OpsDiagnostic {
   issues: OpsIssue[];
   counts: OpsIssueCounts;
+  project_impacts?: OpsProjectImpact[];
   resource_thresholds: EffectiveResourceThreshold[];
   resource_states: OpsResourceState[];
 }
@@ -504,6 +505,20 @@ export interface OpsIssue {
   unit?: string;
   detail: string;
   observed_at?: string;
+}
+
+export interface OpsProjectImpact {
+  project_id: string;
+  project_name: string;
+  status: Status;
+  issue_count: number;
+  error_count: number;
+  warn_count: number;
+  info_count: number;
+  affected_nodes?: string[];
+  affected_services?: string[];
+  issue_kinds?: string[];
+  detail: string;
 }
 
 export interface EffectiveResourceThreshold {

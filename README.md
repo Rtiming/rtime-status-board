@@ -145,8 +145,9 @@ Tailnet Nginx health, public Nginx Basic Auth boundaries, health endpoint,
 telemetry schema, metrics agent freshness, collector issues, recent agent
 reports, per-collector coverage, all node/project/service detail endpoints, and
 bounded node/project metric-history windows and node/project/service check-log
-endpoints. It also verifies runtime API request diagnostics and scans recent
-status-board container logs for fatal/error signatures. It runs `rtime-doctor`
+endpoints. It also verifies runtime API request diagnostics, the ops project
+impact rollup contract, and scans recent status-board container logs for
+fatal/error signatures. It runs `rtime-doctor`
 by default. To skip
 the broader rtime network doctor during a quick status-board check:
 
@@ -336,6 +337,11 @@ current/limit/headroom view assembled from existing latest metrics only; this is
 for quick triage and does not add another collector or polling loop. Node and
 project detail pages reuse the same headroom shape, filtered to the selected
 node or project's related nodes.
+`ops.project_impacts` groups the same issue list by affected project using
+service/project ownership and node-derived project ownership. Each row includes
+status, severity counts, affected nodes/services, issue kinds, and a short
+detail string so project-level troubleshooting does not depend on raw Gatus
+endpoint names.
 `/api/v1/metrics/reports` returns a bounded recent audit log of v2 agent
 reports, including receive time, schema version, collector OK/failure counts,
 GPU presence, and device counts. `/api/v1/diagnostics` includes the same recent

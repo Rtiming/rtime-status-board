@@ -213,6 +213,10 @@ those checks. The thresholds come from `config/status-board.yaml` under
 and storage read/write 100MiB/s in the current config. It also returns
 `resource_states`, a per-node latest-state matrix with current value, limit,
 headroom, status, stale flag, and observed time for the same resource domains.
+It also returns `project_impacts`, a project-level rollup over the same issue
+list. The rollup maps issues to projects from direct project IDs, service
+ownership, and service-derived node ownership, then reports severity counts,
+affected nodes/services, issue kinds, status, and a short detail string.
 This is an on-demand read over existing latest metrics and does not add a new
 collector, writer, or polling loop. Per-node overrides are additive config only
 and do not require frontend API changes. Node and project detail responses

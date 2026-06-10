@@ -521,6 +521,70 @@ func TestOpsDiagnosticAggregatesActionableIssues(t *testing.T) {
 	}
 }
 
+func TestOpsDiagnosticBuildsProjectImpacts(t *testing.T) {
+	cfg := AppConfig{
+		App:   AppMeta{Name: "test"},
+		Nodes: []NodeConfig{{ID: "node-a", Name: "node-a"}, {ID: "node-b", Name: "node-b"}},
+		Projects: []ProjectConfig{
+			{ID: "project-a", Name: "Project A", ServiceIDs: []string{"svc-critical", "svc-ok"}},
+			{ID: "project-b", Name: "Project B", ServiceIDs: []string{"svc-b"}},
+		},
+		Services: []ServiceConfig{
+			{ID: "svc-critical", Name: "Critical Service", NodeID: "node-a", ProjectID: "project-a"},
+			{ID: "svc-ok", Name: "OK Service", NodeID: "node-a", ProjectID: "project-a"},
+			{ID: "svc-b", Name: "B Service", NodeID: "node-b", ProjectID: "project-b"},
+		},
+	}
+	aggregator := NewAggregator(&cfg, nil, nil, 0)
+	now := time.Date(2026, 6, 10, 6, 0, 0, 0, time.UTC)
+	services := []ServiceView{
+		{
+			ServiceConfig: ServiceConfig{ID: "svc-critical", Name: "Critical Service", NodeID: "node-a", ProjectID: "project-a", Critical: true},
+			Status:        StatusDown,
+			Detail:        "connection refused",
+			LastCheckedAt: now.Add(-time.Minute),
+		},
+		{
+			ServiceConfig: ServiceConfig{ID: "svc-ok", Name: "OK Service", NodeID: "node-a", ProjectID: "project-a"},
+			Status:        StatusOK,
+		},
+		{
+			ServiceConfig: ServiceConfig{ID: "svc-b", Name: "B Service", NodeID: "node-b", ProjectID: "project-b"},
+			Status:        StatusOK,
+		},
+	}
+	metricDiag := MetricsDiagnostic{
+		ExpectedNodes: []string{"node-a", "node-b"},
+		MissingNodes:  []string{"node-a"},
+		CollectorIssues: []MetricsCollectorIssue{
+			{NodeID: "node-b", Name: "processes", Detail: "ps failed"},
+		},
+		ServiceResourceIssues: []ServiceResourceIssue{
+			{ServiceID: "svc-critical", ServiceName: "Critical Service", NodeID: "node-a", Severity: "warn", Metric: "memory", Detail: "memory exceeds budget"},
+		},
+	}
+
+	ops := aggregator.opsDiagnostic(now, services, nil, metricDiag, nil)
+	impacts := map[string]OpsProjectImpact{}
+	for _, impact := range ops.ProjectImpacts {
+		impacts[impact.ProjectID] = impact
+	}
+	projectA := impacts["project-a"]
+	if projectA.ProjectName != "Project A" || projectA.Status != StatusDown || projectA.ErrorCount != 1 || projectA.WarnCount != 2 {
+		t.Fatalf("project-a impact = %#v, want one error and two warnings", projectA)
+	}
+	if !stringSliceEqual(projectA.AffectedNodes, []string{"node-a"}) || !stringSliceEqual(projectA.AffectedServices, []string{"svc-critical"}) {
+		t.Fatalf("project-a affected = nodes:%#v services:%#v, want node-a and svc-critical", projectA.AffectedNodes, projectA.AffectedServices)
+	}
+	projectB := impacts["project-b"]
+	if projectB.ProjectName != "Project B" || projectB.Status != StatusDegraded || projectB.WarnCount != 1 {
+		t.Fatalf("project-b impact = %#v, want one warning", projectB)
+	}
+	if !stringSliceEqual(projectB.IssueKinds, []string{"collector"}) {
+		t.Fatalf("project-b kinds = %#v, want collector", projectB.IssueKinds)
+	}
+}
+
 func TestOpsDiagnosticUsesConfiguredResourceThresholds(t *testing.T) {
 	cfg := AppConfig{
 		App:   AppMeta{Name: "test"},
@@ -2107,4 +2171,16 @@ func testMetricsReportV2(nodeID string, capturedAt time.Time, storageRead, stora
 			Uptime: UptimeMetrics{Seconds: 100},
 		},
 	}
+}
+
+func stringSliceEqual(got, want []string) bool {
+	if len(got) != len(want) {
+		return false
+	}
+	for i := range got {
+		if got[i] != want[i] {
+			return false
+		}
+	}
+	return true
 }
