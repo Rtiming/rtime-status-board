@@ -481,8 +481,40 @@ func TestMetricsDiagnosticCollectorSummary(t *testing.T) {
 	}
 	containers := byName["containers"]
 	if containers.Status != StatusDegraded || containers.ObservedNodes != 1 || len(containers.MissingNodes) != 1 || containers.MissingNodes[0] != "node-a" ||
-		containers.CachedNodes != 1 || containers.MaxCacheAgeSeconds != 120 {
+		containers.CachedNodes != 1 || containers.StaleCachedNodes != 0 || containers.CacheWarnSeconds != 600 || containers.MaxCacheAgeSeconds != 120 {
 		t.Fatalf("containers summary = %#v, want missing node-a and cached node-b", containers)
+	}
+}
+
+func TestMetricsDiagnosticCollectorSummaryFlagsStaleCache(t *testing.T) {
+	cfg := AppConfig{
+		App:   AppMeta{Name: "test"},
+		Nodes: []NodeConfig{{ID: "node-a", Name: "node-a"}, {ID: "node-b", Name: "node-b"}},
+	}
+	aggregator := NewAggregator(&cfg, nil, nil, 0)
+	diag := aggregator.metricsDiagnostic([]MetricsView{
+		{
+			MetricsReport: MetricsReport{NodeID: "node-a"},
+			CollectorStatus: []CollectorStatus{
+				{Name: "containers", OK: true, Cached: true, CacheAgeSeconds: 601},
+			},
+		},
+		{
+			MetricsReport: MetricsReport{NodeID: "node-b"},
+			CollectorStatus: []CollectorStatus{
+				{Name: "containers", OK: true, Cached: true, CacheAgeSeconds: 300},
+			},
+		},
+	})
+	containers := diag.CollectorSummary[0]
+	if containers.Name != "containers" || containers.Status != StatusDegraded || containers.StaleCachedNodes != 1 || len(containers.StaleCachedNodeIDs) != 1 || containers.StaleCachedNodeIDs[0] != "node-a" {
+		t.Fatalf("containers summary = %#v, want one stale cached node", containers)
+	}
+	if got := metricsProviderStatus(nil, diag); got != StatusDegraded {
+		t.Fatalf("metrics provider status = %s, want degraded", got)
+	}
+	if detail := metricsProviderDetail(nil, diag); !strings.Contains(detail, "collector degraded: containers") {
+		t.Fatalf("metrics provider detail = %q, want degraded collector detail", detail)
 	}
 }
 

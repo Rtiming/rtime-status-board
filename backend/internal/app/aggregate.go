@@ -2326,10 +2326,11 @@ func metricsCollectorSummary(metrics []MetricsView, reportingNodes []string) []M
 	summaries := make([]MetricsCollectorSummary, 0, len(names))
 	for _, name := range names {
 		summary := MetricsCollectorSummary{
-			Name:           name,
-			Status:         StatusOK,
-			ReportingNodes: len(reportingNodes),
-			Detail:         "collector is healthy across reporting nodes",
+			Name:             name,
+			Status:           StatusOK,
+			ReportingNodes:   len(reportingNodes),
+			CacheWarnSeconds: collectorCacheWarnSeconds(name),
+			Detail:           "collector is healthy across reporting nodes",
 		}
 		var elapsedTotal int64
 		var elapsedCount int
@@ -2357,15 +2358,20 @@ func metricsCollectorSummary(metrics []MetricsView, reportingNodes []string) []M
 				if collector.CacheAgeSeconds > summary.MaxCacheAgeSeconds {
 					summary.MaxCacheAgeSeconds = collector.CacheAgeSeconds
 				}
+				if summary.CacheWarnSeconds > 0 && collector.CacheAgeSeconds > summary.CacheWarnSeconds {
+					summary.StaleCachedNodes++
+					summary.StaleCachedNodeIDs = append(summary.StaleCachedNodeIDs, nodeID)
+				}
 			}
 		}
 		sort.Strings(summary.MissingNodes)
 		sort.Strings(summary.FailedNodeIDs)
 		sort.Strings(summary.CachedNodeIDs)
+		sort.Strings(summary.StaleCachedNodeIDs)
 		if elapsedCount > 0 {
 			summary.AvgElapsedMS = float64(elapsedTotal) / float64(elapsedCount)
 		}
-		if summary.FailedNodes > 0 || len(summary.MissingNodes) > 0 {
+		if summary.FailedNodes > 0 || len(summary.MissingNodes) > 0 || summary.StaleCachedNodes > 0 {
 			summary.Status = StatusDegraded
 			parts := []string{}
 			if summary.FailedNodes > 0 {
@@ -2373,6 +2379,9 @@ func metricsCollectorSummary(metrics []MetricsView, reportingNodes []string) []M
 			}
 			if len(summary.MissingNodes) > 0 {
 				parts = append(parts, fmt.Sprintf("%d missing", len(summary.MissingNodes)))
+			}
+			if summary.StaleCachedNodes > 0 {
+				parts = append(parts, fmt.Sprintf("%d stale cached", summary.StaleCachedNodes))
 			}
 			if summary.CachedNodes > 0 {
 				parts = append(parts, fmt.Sprintf("%d cached", summary.CachedNodes))
@@ -2384,6 +2393,17 @@ func metricsCollectorSummary(metrics []MetricsView, reportingNodes []string) []M
 		summaries = append(summaries, summary)
 	}
 	return summaries
+}
+
+func collectorCacheWarnSeconds(name string) float64 {
+	switch name {
+	case "gpu":
+		return 240
+	case "containers", "processes":
+		return 600
+	default:
+		return 0
+	}
 }
 
 func (a *Aggregator) serviceResourceBudgetStatuses(metrics []MetricsView) ([]ServiceResourceBudgetStatus, []ServiceResourceIssue) {
@@ -2728,8 +2748,13 @@ func metricsProviderStatus(err error, metrics MetricsDiagnostic) Status {
 	if len(metrics.ReportingNodes) == 0 {
 		return StatusDown
 	}
-	if len(metrics.MissingNodes) > 0 || len(metrics.StaleNodes) > 0 {
+	if len(metrics.MissingNodes) > 0 || len(metrics.StaleNodes) > 0 || len(metrics.CollectorIssues) > 0 {
 		return StatusDegraded
+	}
+	for _, collector := range metrics.CollectorSummary {
+		if collector.Status != StatusOK {
+			return StatusDegraded
+		}
 	}
 	return StatusOK
 }
@@ -2744,6 +2769,16 @@ func metricsProviderDetail(err error, metrics MetricsDiagnostic) string {
 	}
 	if len(metrics.StaleNodes) > 0 {
 		parts = append(parts, "stale: "+strings.Join(metrics.StaleNodes, ", "))
+	}
+	degradedCollectors := []string{}
+	for _, collector := range metrics.CollectorSummary {
+		if collector.Status != StatusOK {
+			degradedCollectors = append(degradedCollectors, collector.Name)
+		}
+	}
+	if len(degradedCollectors) > 0 {
+		sort.Strings(degradedCollectors)
+		parts = append(parts, "collector degraded: "+strings.Join(degradedCollectors, ", "))
 	}
 	return strings.Join(parts, "; ")
 }

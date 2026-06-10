@@ -413,7 +413,9 @@ show up in collector diagnostics. Heavier optional collectors are cached between
 agent runs: GPU refreshes every 120s by default, while container and process
 snapshots refresh every 300s by default. Reports still include the latest cached
 values each minute and mark cached collector rows with `cached` and
-`cache_age_seconds`.
+`cache_age_seconds`. Diagnostics derives cache-age budgets from those heavy
+collector defaults and marks stale cached GPU/container/process rows when they
+exceed that budget, without adding another collector or write path.
 
 ```bash
 STATUS_BOARD_AGENT_TOKEN=<token> make deploy-sh-core

@@ -283,12 +283,15 @@ export interface MetricsCollectorSummary {
   ok_nodes: number;
   failed_nodes: number;
   cached_nodes: number;
+  stale_cached_nodes: number;
   missing_nodes?: string[];
   failed_node_ids?: string[];
   cached_node_ids?: string[];
+  stale_cached_node_ids?: string[];
   avg_elapsed_ms: number;
   max_elapsed_ms: number;
   max_cache_age_seconds: number;
+  cache_warn_seconds?: number;
   detail: string;
 }
 

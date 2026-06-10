@@ -134,9 +134,10 @@ high-cardinality process rows.
 process collector failures. It also includes `collector_summary`, a per-
 collector coverage matrix derived from latest agent reports. Each row shows the
 collector name, status, reporting/observed node counts, OK/failed/cached node
-counts, missing/failed/cached node IDs, average/max elapsed time, and max cache
-age. This is a read-only aggregation over already-stored latest metrics and does
-not add a collector or polling loop.
+counts, stale cached count, missing/failed/cached/stale-cached node IDs,
+average/max elapsed time, max cache age, and cache warning budget where one is
+defined. Cache warnings are derived from already-reported `cache_age_seconds`;
+they do not add a collector or polling loop.
 
 `/api/v1/diagnostics.metrics.service_resource_budgets` evaluates optional
 service-level budgets from static config against the latest container snapshot.

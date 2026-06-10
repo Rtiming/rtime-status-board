@@ -113,6 +113,9 @@ Current implementation status:
   agent reports. It shows observed, OK, failed, cached, and missing nodes plus
   elapsed/cache-age summaries for each reported collector, so old agents or
   partially failing collectors are visible without adding another polling loop.
+  It also marks stale cached heavy collectors when cached GPU/container/process
+  snapshots exceed their low-frequency cache budget, distinguishing intentional
+  low-load caching from a stuck collector.
 - Diagnostics now evaluates optional service resource budgets from static
   config against latest Docker container snapshots. This keeps heavy services
   such as Khoj visible without adding a new collector or long-retention metrics

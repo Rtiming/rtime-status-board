@@ -455,11 +455,15 @@ for name in ("gpu", "containers", "processes"):
     row = summary_by_name.get(name)
     if not row:
         raise SystemExit(f"collector summary missing {name}: {collector_summary}")
-    for key in ("status", "reporting_nodes", "observed_nodes", "ok_nodes", "failed_nodes", "cached_nodes", "avg_elapsed_ms", "max_elapsed_ms"):
+    for key in ("status", "reporting_nodes", "observed_nodes", "ok_nodes", "failed_nodes", "cached_nodes", "stale_cached_nodes", "avg_elapsed_ms", "max_elapsed_ms", "max_cache_age_seconds"):
         if key not in row:
             raise SystemExit(f"collector summary {name} missing {key}: {row}")
     if row.get("status") != "ok":
         raise SystemExit(f"collector summary {name} is not ok: {row}")
+    if row.get("stale_cached_nodes", 0) != 0:
+        raise SystemExit(f"collector summary {name} has stale cached nodes: {row}")
+    if name in ("gpu", "containers", "processes") and row.get("cache_warn_seconds", 0) <= 0:
+        raise SystemExit(f"collector summary {name} missing cache warning budget: {row}")
 
 budget_by_service = {row.get("service_id"): row for row in service_resource_budgets}
 for service_id in ("orangepi-khoj", "sh-core-status-board-api"):

@@ -337,12 +337,15 @@ type MetricsCollectorSummary struct {
 	OKNodes            int      `json:"ok_nodes"`
 	FailedNodes        int      `json:"failed_nodes"`
 	CachedNodes        int      `json:"cached_nodes"`
+	StaleCachedNodes   int      `json:"stale_cached_nodes"`
 	MissingNodes       []string `json:"missing_nodes,omitempty"`
 	FailedNodeIDs      []string `json:"failed_node_ids,omitempty"`
 	CachedNodeIDs      []string `json:"cached_node_ids,omitempty"`
+	StaleCachedNodeIDs []string `json:"stale_cached_node_ids,omitempty"`
 	AvgElapsedMS       float64  `json:"avg_elapsed_ms"`
 	MaxElapsedMS       int64    `json:"max_elapsed_ms"`
 	MaxCacheAgeSeconds float64  `json:"max_cache_age_seconds"`
+	CacheWarnSeconds   float64  `json:"cache_warn_seconds,omitempty"`
 	Detail             string   `json:"detail"`
 }
 

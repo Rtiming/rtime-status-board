@@ -639,6 +639,7 @@ export function Diagnostics({
                     <th>{t.avgElapsed}</th>
                     <th>{t.maxElapsed}</th>
                     <th>{t.maxCacheAge}</th>
+                    <th>{t.cacheBudget}</th>
                     <th>{t.detail}</th>
                   </tr>
                 </thead>
@@ -654,10 +655,12 @@ export function Diagnostics({
                       <td>{formatSeconds((collector.avg_elapsed_ms ?? 0) / 1000)}</td>
                       <td>{formatSeconds((collector.max_elapsed_ms ?? 0) / 1000)}</td>
                       <td>{collector.max_cache_age_seconds > 0 ? formatSeconds(collector.max_cache_age_seconds) : '-'}</td>
+                      <td>{collector.cache_warn_seconds ? formatSeconds(collector.cache_warn_seconds) : '-'}</td>
                       <td>
                         {collector.detail || '-'}
                         {(collector.failed_node_ids?.length ?? 0) > 0 && <span>{t.failedNodes}: {formatList(collector.failed_node_ids)}</span>}
                         {(collector.cached_node_ids?.length ?? 0) > 0 && <span>{t.cachedNodes}: {formatList(collector.cached_node_ids)}</span>}
+                        {(collector.stale_cached_node_ids?.length ?? 0) > 0 && <span>{t.staleCached}: {formatList(collector.stale_cached_node_ids)}</span>}
                       </td>
                     </tr>
                   ))}
