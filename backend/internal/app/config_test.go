@@ -349,8 +349,8 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 		MissingNodes:   []string{"node-b"},
 		StaleNodes:     []string{"node-d"},
 	}, []RuntimeEndpointStatus{
-		{Key: "endpoint-ok", RecentResults: 3, RecentFailures: 0, LastCheckedAt: base.Add(-2 * time.Minute)},
-		{Key: "endpoint-down", RecentResults: 4, RecentFailures: 2, LastCheckedAt: base},
+		{Key: "endpoint-ok", RecentResults: 3, RecentFailures: 0, ResponseTimeMS: 12, LastCheckedAt: base.Add(-2 * time.Minute)},
+		{Key: "endpoint-down", RecentResults: 4, RecentFailures: 2, ResponseTimeMS: 80, LastCheckedAt: base},
 	}, []Event{
 		{Kind: "project", SubjectID: "project-a", CreatedAt: base.Add(-5 * time.Minute)},
 		{Kind: "service", SubjectID: "svc-down", CreatedAt: base.Add(-3 * time.Minute)},
@@ -382,8 +382,44 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 	if row.RecentCheckCount != 7 || row.RecentFailureCount != 2 || row.LastCheckAt == nil || !row.LastCheckAt.Equal(base) {
 		t.Fatalf("recent check summary = %#v, want 7 checks, 2 failures, latest %s", row, base)
 	}
+	if row.RecentSuccessCount != 5 || row.NoRecentCheckCount != 0 {
+		t.Fatalf("recent check quality = %#v, want 5 successes and no missing recent logs", row)
+	}
+	if row.CheckCoveragePercent != 50 || row.RecentFailurePercent < 28 || row.RecentFailurePercent > 29 {
+		t.Fatalf("recent check percentages = %#v, want 50%% coverage and about 28.6%% failures", row)
+	}
+	if row.CurrentAvgResponseMS != 46 || row.CurrentMaxResponseMS != 80 {
+		t.Fatalf("recent check latency = %#v, want avg 46ms max 80ms", row)
+	}
 	if row.RecentEventCount != 3 || row.LastEventAt == nil || !row.LastEventAt.Equal(base.Add(-time.Minute)) {
 		t.Fatalf("recent event summary = %#v, want 3 related events and latest node event", row)
+	}
+}
+
+func TestProjectDiagnosticsFlagsMissingRecentCheckLogs(t *testing.T) {
+	cfg := AppConfig{App: AppMeta{Name: "test"}}
+	aggregator := NewAggregator(&cfg, nil, nil, 0)
+	projects := []ProjectView{
+		{ProjectConfig: ProjectConfig{ID: "project-a", Name: "Project A"}, Status: StatusOK},
+	}
+	services := []ServiceView{
+		{ServiceConfig: ServiceConfig{ID: "svc-a", Name: "Service A", ProjectID: "project-a", NodeID: "node-a", EndpointKey: "endpoint-a"}, Status: StatusOK},
+	}
+	diag := aggregator.projectDiagnostics(projects, services, MetricsDiagnostic{
+		ReportingNodes: []string{"node-a"},
+	}, []RuntimeEndpointStatus{
+		{Key: "endpoint-a", Status: StatusOK, RecentResults: 0, RecentFailures: 0, ResponseTimeMS: 3},
+	}, nil)
+
+	if len(diag) != 1 {
+		t.Fatalf("project diagnostics = %#v, want one row", diag)
+	}
+	row := diag[0]
+	if row.Status != StatusDegraded || row.NoRecentCheckCount != 1 {
+		t.Fatalf("project diagnostic = %#v, want degraded missing recent check logs", row)
+	}
+	if !strings.Contains(row.Detail, "mapped endpoints have no recent check log") {
+		t.Fatalf("detail = %q, want missing recent check log detail", row.Detail)
 	}
 }
 

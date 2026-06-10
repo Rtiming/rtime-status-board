@@ -162,8 +162,9 @@ export function Diagnostics({
                     </td>
                     <td>
                       <strong>{project.endpoint_count}/{project.service_count}</strong>
+                      <span>{t.checkCoverage}: {formatProjectPercent(project.check_coverage_percent)}</span>
                       <span>{t.missingEndpoint}: {project.missing_endpoint_count}</span>
-                      <span>{t.unmapped}: {project.unmapped_service_count}</span>
+                      <span>{t.unmapped}: {project.unmapped_service_count} · {t.noRecentChecks}: {project.no_recent_check_count ?? 0}</span>
                     </td>
                     <td>
                       <strong>{project.metrics_reporting_nodes.length}/{project.related_nodes.length}</strong>
@@ -174,7 +175,9 @@ export function Diagnostics({
                     </td>
                     <td>
                       <strong>{project.recent_check_count ?? 0}</strong>
-                      <span>{t.projectRecentFailures}: {project.recent_failure_count ?? 0}</span>
+                      <span>{t.projectRecentSuccesses}: {project.recent_success_count ?? 0} · {t.projectRecentFailures}: {project.recent_failure_count ?? 0}</span>
+                      <span>{t.failureRate}: {formatProjectPercent(project.recent_failure_percent)}</span>
+                      <span>{t.currentLatency}: {formatLatencyPair(project.current_avg_response_time_ms, project.current_max_response_time_ms, t.avgLatency, t.maxLatency)}</span>
                       <span>{t.last}: {formatTime(project.last_check_at)}</span>
                       <span>{t.projectRecentEvents}: {project.recent_event_count ?? 0} · {t.last}: {formatTime(project.last_event_at)}</span>
                     </td>
@@ -810,6 +813,15 @@ function formatServiceBudgetCPU(budget: ServiceResourceBudgetStatus, cpuLabel: s
   if (!budget.max_cpu_percent) return usage;
   const remaining = formatSignedOpsValue(budget.cpu_headroom_percent ?? 0, '%');
   return `${usage} / ${budget.max_cpu_percent.toFixed(1)}% · ${remainingLabel} ${remaining}`;
+}
+
+function formatProjectPercent(value: number | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '-';
+  return `${value.toFixed(value >= 10 ? 0 : 1)}%`;
+}
+
+function formatLatencyPair(avg: number | undefined, max: number | undefined, avgLabel: string, maxLabel: string) {
+  return `${avgLabel} ${formatLatencyMS(avg)} · ${maxLabel} ${formatLatencyMS(max)}`;
 }
 
 function formatAgentReportLag(row: AgentNodeDiagnostic, remainingLabel: string) {

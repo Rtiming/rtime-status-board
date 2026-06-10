@@ -464,12 +464,18 @@ export interface ProjectDiagnostic {
   endpoint_count: number;
   missing_endpoint_count: number;
   unmapped_service_count: number;
+  check_coverage_percent: number;
   related_nodes: string[];
   metrics_reporting_nodes: string[];
   metrics_missing_nodes: string[];
   metrics_stale_nodes: string[];
   recent_check_count: number;
+  recent_success_count: number;
   recent_failure_count: number;
+  recent_failure_percent: number;
+  no_recent_check_count: number;
+  current_avg_response_time_ms: number;
+  current_max_response_time_ms: number;
   last_check_at?: string;
   recent_event_count: number;
   last_event_at?: string;

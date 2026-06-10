@@ -205,9 +205,11 @@ row includes project ID/name/status/detail, service and critical-service counts,
 down/degraded service counts, Gatus endpoint coverage, unmapped or missing
 endpoint counts, related nodes, and which related nodes are reporting, missing,
 or stale in the latest metrics-agent view. It also includes recent check count,
-recent failure count, latest check time, recent related event count, and latest
-event time. It reuses the diagnostics request's already-loaded services,
-endpoint statuses, recent SQLite events, and metrics freshness data.
+recent success/failure counts, failure percentage, check coverage percentage,
+mapped endpoints without recent check logs, current average/max response time,
+latest check time, recent related event count, and latest event time. It reuses
+the diagnostics request's already-loaded services, endpoint statuses, recent
+SQLite events, and metrics freshness data.
 
 `/api/v1/diagnostics.event_log` embeds the latest status-change events from the
 existing SQLite event table. It is bounded to the latest 20 events in the

@@ -347,8 +347,9 @@ socket, run shell commands, or add another process.
 existing service config, Gatus endpoint mappings, and latest metrics-agent
 freshness. It shows service counts, critical/down/degraded counts, mapped versus
 missing endpoint coverage, related nodes, and metric-report coverage per
-project. It also summarizes recent Gatus check rows, recent check failures,
-latest check time, related status-change events, and latest event time per
+project. It also summarizes recent Gatus check rows, success/failure counts,
+failure rate, mapped endpoints without recent logs, current average/max response
+time, latest check time, related status-change events, and latest event time per
 project. It performs no additional checks and writes no history.
 `/api/v1/diagnostics.event_log` embeds a bounded newest-first status-change log
 from SQLite. It returns total event rows, returned rows, latest event time,

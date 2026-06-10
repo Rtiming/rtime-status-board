@@ -770,6 +770,8 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 		metricsMissing := map[string]bool{}
 		metricsStale := map[string]bool{}
 		var latestCheck time.Time
+		var endpointLatencyTotal int64
+		var endpointLatencyCount int
 
 		for _, service := range services {
 			if !projectOwnsService(project.ProjectConfig, service) {
@@ -793,6 +795,19 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 				endpoint := endpointStatusByKey[service.EndpointKey]
 				diag.RecentCheckCount += endpoint.RecentResults
 				diag.RecentFailureCount += endpoint.RecentFailures
+				if endpoint.RecentResults > endpoint.RecentFailures {
+					diag.RecentSuccessCount += endpoint.RecentResults - endpoint.RecentFailures
+				}
+				if endpoint.RecentResults == 0 {
+					diag.NoRecentCheckCount++
+				}
+				if endpoint.ResponseTimeMS >= 0 {
+					endpointLatencyTotal += endpoint.ResponseTimeMS
+					endpointLatencyCount++
+					if endpoint.ResponseTimeMS > diag.CurrentMaxResponseMS {
+						diag.CurrentMaxResponseMS = endpoint.ResponseTimeMS
+					}
+				}
 				if endpoint.LastCheckedAt.After(latestCheck) {
 					latestCheck = endpoint.LastCheckedAt
 				}
@@ -818,6 +833,15 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 			lastCheck := latestCheck
 			diag.LastCheckAt = &lastCheck
 		}
+		if diag.ServiceCount > 0 {
+			diag.CheckCoveragePercent = float64(diag.EndpointCount) / float64(diag.ServiceCount) * 100
+		}
+		if diag.RecentCheckCount > 0 {
+			diag.RecentFailurePercent = float64(diag.RecentFailureCount) / float64(diag.RecentCheckCount) * 100
+		}
+		if endpointLatencyCount > 0 {
+			diag.CurrentAvgResponseMS = float64(endpointLatencyTotal) / float64(endpointLatencyCount)
+		}
 		diag.RecentEventCount, diag.LastEventAt = projectEventSummary(project.ID, serviceSet, nodeSet, events)
 		diag.MetricsReportingNodes = sortedKeys(metricsReporting)
 		diag.MetricsMissingNodes = sortedKeys(metricsMissing)
@@ -831,6 +855,9 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 		}
 		if diag.MissingEndpointCount > 0 {
 			details = append(details, fmt.Sprintf("%d endpoint mappings are missing in Gatus", diag.MissingEndpointCount))
+		}
+		if diag.NoRecentCheckCount > 0 {
+			details = append(details, fmt.Sprintf("%d mapped endpoints have no recent check log", diag.NoRecentCheckCount))
 		}
 		if diag.DownServiceCount > 0 || diag.DegradedServiceCount > 0 {
 			details = append(details, fmt.Sprintf("%d down and %d degraded/unknown services", diag.DownServiceCount, diag.DegradedServiceCount))
@@ -886,7 +913,7 @@ func projectDiagnosticStatus(diag ProjectDiagnostic, projectStatus Status) Statu
 	if diag.DownServiceCount > 0 {
 		return StatusDown
 	}
-	if diag.ServiceCount == 0 || diag.UnmappedServiceCount > 0 || diag.MissingEndpointCount > 0 || len(diag.MetricsMissingNodes) > 0 || len(diag.MetricsStaleNodes) > 0 {
+	if diag.ServiceCount == 0 || diag.UnmappedServiceCount > 0 || diag.MissingEndpointCount > 0 || diag.NoRecentCheckCount > 0 || len(diag.MetricsMissingNodes) > 0 || len(diag.MetricsStaleNodes) > 0 {
 		return StatusDegraded
 	}
 	if diag.DegradedServiceCount > 0 {

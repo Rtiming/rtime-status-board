@@ -440,6 +440,7 @@ if schema.get("version") != 2:
 
 metric_diag = diagnostics.get("metrics", {})
 agent_health = diagnostics.get("agent_health") or []
+project_diag = diagnostics.get("projects") or []
 missing = metric_diag.get("missing_nodes") or []
 stale = metric_diag.get("stale_nodes") or []
 collector_issues = metric_diag.get("collector_issues") or []
@@ -486,6 +487,27 @@ if sorted(status_board_budget.get("matched_containers") or []) != ["rtime-status
 if status_board_budget.get("memory_headroom_bytes", 0) <= 0 or status_board_budget.get("cpu_headroom_percent", 0) <= 0:
     raise SystemExit(f"status-board budget has no positive headroom: {status_board_budget}")
 
+if len(project_diag) != len(projects):
+    raise SystemExit(f"project diagnostics rows = {len(project_diag)}, want {len(projects)}: {project_diag}")
+for row in project_diag:
+    for key in ("project_id", "status", "service_count", "endpoint_count", "check_coverage_percent", "recent_check_count", "recent_success_count", "recent_failure_count", "recent_failure_percent", "no_recent_check_count", "current_avg_response_time_ms", "current_max_response_time_ms", "detail"):
+        if key not in row:
+            raise SystemExit(f"project diagnostics row missing {key}: {row}")
+    if row.get("status") != "ok":
+        raise SystemExit(f"project diagnostics row is not ok: {row}")
+    if row.get("service_count", 0) < 1 or row.get("endpoint_count", 0) < 1:
+        raise SystemExit(f"project diagnostics row has no service or endpoint coverage: {row}")
+    if row.get("check_coverage_percent", 0) < 100:
+        raise SystemExit(f"project diagnostics row has incomplete check coverage: {row}")
+    if row.get("recent_check_count", 0) < 1:
+        raise SystemExit(f"project diagnostics row has no recent check logs: {row}")
+    if row.get("recent_success_count", 0) + row.get("recent_failure_count", 0) != row.get("recent_check_count", 0):
+        raise SystemExit(f"project diagnostics row has inconsistent recent check counts: {row}")
+    if row.get("no_recent_check_count", 0) != 0:
+        raise SystemExit(f"project diagnostics row has endpoints without recent logs: {row}")
+    if row.get("current_avg_response_time_ms", -1) < 0 or row.get("current_max_response_time_ms", -1) < 0:
+        raise SystemExit(f"project diagnostics row has invalid response latency fields: {row}")
+
 if len(metrics) != EXPECTED_NODE_COUNT:
     raise SystemExit(f"metrics node count = {len(metrics)}, want {EXPECTED_NODE_COUNT}")
 
@@ -518,6 +540,7 @@ print(f"  reporting nodes: {len(metric_diag.get('reporting_nodes') or [])}/{len(
 print(f"  metrics nodes: {len(metrics)}")
 print(f"  collector summaries: {len(collector_summary)}")
 print(f"  service resource budgets: {len(service_resource_budgets)}")
+print(f"  project diagnostics rows: {len(project_diag)}")
 print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_names)}")
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
 print(f"  agent health rows: {len(agent_health)}")

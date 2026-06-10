@@ -456,12 +456,18 @@ type ProjectDiagnostic struct {
 	EndpointCount         int        `json:"endpoint_count"`
 	MissingEndpointCount  int        `json:"missing_endpoint_count"`
 	UnmappedServiceCount  int        `json:"unmapped_service_count"`
+	CheckCoveragePercent  float64    `json:"check_coverage_percent"`
 	RelatedNodes          []string   `json:"related_nodes"`
 	MetricsReportingNodes []string   `json:"metrics_reporting_nodes"`
 	MetricsMissingNodes   []string   `json:"metrics_missing_nodes"`
 	MetricsStaleNodes     []string   `json:"metrics_stale_nodes"`
 	RecentCheckCount      int        `json:"recent_check_count"`
+	RecentSuccessCount    int        `json:"recent_success_count"`
 	RecentFailureCount    int        `json:"recent_failure_count"`
+	RecentFailurePercent  float64    `json:"recent_failure_percent"`
+	NoRecentCheckCount    int        `json:"no_recent_check_count"`
+	CurrentAvgResponseMS  float64    `json:"current_avg_response_time_ms"`
+	CurrentMaxResponseMS  int64      `json:"current_max_response_time_ms"`
 	LastCheckAt           *time.Time `json:"last_check_at,omitempty"`
 	RecentEventCount      int        `json:"recent_event_count"`
 	LastEventAt           *time.Time `json:"last_event_at,omitempty"`

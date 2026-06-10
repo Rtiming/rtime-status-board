@@ -189,6 +189,11 @@ Current implementation status:
   `GET /api/v1/projects/:id/checks?window=24h&limit=60`; the Projects tab now
   shows a bounded newest-first log of related service checks, errors, failed
   conditions, and latency without adding persistence or a polling loop.
+- Global Diagnostics project coverage now also exposes derived check-log
+  quality per project: check coverage percentage, recent success/failure
+  counts, failure percentage, endpoints without recent logs, and current
+  average/max response time. It is computed from the same already-loaded Gatus
+  endpoint status rows.
 - Project detail now also shows a bounded related-node Agent report view by
   reading `GET /api/v1/metrics/reports?limit=100` once and filtering to the
   project's nodes. This gives project-level collector freshness, lag, schema,
