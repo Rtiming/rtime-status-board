@@ -122,7 +122,10 @@ make prod-logs-sh-core
 
 `deploy-sh-core` syncs the project to `/opt/rtime-status-board`, creates
 `.env.production` from `.env.example` only when missing, and verifies the remote
-Docker Compose plugin. If Compose is absent, run:
+Docker Compose plugin. It also patches non-sensitive deployment metadata in the
+remote `.env.production`, including the current Git commit and UTC build time,
+so `/api/v1/diagnostics.runtime.build` can prove which revision is live. If
+Compose is absent, run:
 
 ```bash
 make install-compose-sh-core
@@ -184,10 +187,12 @@ Example entries:
 
 Replace these in `.env.production` and
 `deploy/nginx/status.local.conf` for a real deployment.
-`make deploy-sh-core` syncs only non-sensitive public metadata keys from the
-ignored local `.env.production` into the remote `.env.production`:
+`make deploy-sh-core` syncs only non-sensitive public/deployment metadata keys
+from the ignored local `.env.production` and local Git checkout into the remote
+`.env.production`:
 `STATUS_BOARD_PUBLIC_DOMAIN`, `STATUS_BOARD_PUBLIC_IP`, and
-`STATUS_BOARD_TAILNET_URL`. Secrets such as heartbeat or agent tokens are not
+`STATUS_BOARD_TAILNET_URL`, plus `STATUS_BOARD_BUILD_COMMIT` and
+`STATUS_BOARD_BUILD_TIME`. Secrets such as heartbeat or agent tokens are not
 copied by this path.
 
 On sh-core, install or refresh the public HTTPS entry with:
@@ -319,9 +324,9 @@ logs.
 against the latest container snapshots. This keeps heavier services visible
 without adding another collector or polling loop.
 `/api/v1/diagnostics.runtime` exposes status-board self-diagnostics: process
-uptime, Go runtime memory, summary cache state, and SQLite size/row-count
-health. These values are read on demand from the current process and database;
-they do not add a background collector.
+uptime, Go runtime memory, build commit/time, summary cache state, and SQLite
+size/row-count health. These values are read on demand from the current process,
+environment, and database; they do not add a background collector.
 `/api/v1/diagnostics.deployment` exposes deployment-boundary checks for the
 status board itself: runtime mode, localhost bind address, Gatus URL, config
 path, SQLite data path, frontend artifact path, cache TTL, retention, and store

@@ -378,10 +378,16 @@ type RuntimeDiagnostic struct {
 	UptimeSeconds float64                 `json:"uptime_seconds"`
 	GoVersion     string                  `json:"go_version"`
 	Goroutines    int                     `json:"goroutines"`
+	Build         RuntimeBuildDiagnostic  `json:"build"`
 	Memory        RuntimeMemoryDiagnostic `json:"memory"`
 	SummaryCache  SummaryCacheDiagnostic  `json:"summary_cache"`
 	Store         StoreDiagnostic         `json:"store"`
 	Requests      APIRequestDiagnostic    `json:"requests"`
+}
+
+type RuntimeBuildDiagnostic struct {
+	Commit  string `json:"commit,omitempty"`
+	BuiltAt string `json:"built_at,omitempty"`
 }
 
 type RuntimeSettings struct {
@@ -397,6 +403,8 @@ type RuntimeSettings struct {
 	PublicDomain          string
 	PublicIP              string
 	TailnetStatusURL      string
+	BuildCommit           string
+	BuildTime             string
 }
 
 type DeploymentDiagnostic struct {

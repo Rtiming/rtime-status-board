@@ -324,10 +324,16 @@ export interface RuntimeDiagnostic {
   uptime_seconds: number;
   go_version: string;
   goroutines: number;
+  build: RuntimeBuildDiagnostic;
   memory: RuntimeMemoryDiagnostic;
   summary_cache: SummaryCacheDiagnostic;
   store: StoreDiagnostic;
   requests?: APIRequestDiagnostic;
+}
+
+export interface RuntimeBuildDiagnostic {
+  commit?: string;
+  built_at?: string;
 }
 
 export interface RuntimeMemoryDiagnostic {

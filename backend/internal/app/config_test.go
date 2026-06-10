@@ -1609,7 +1609,10 @@ func TestDiagnosticsIncludesRuntimeStoreAndCache(t *testing.T) {
 			{ID: "svc-a", Name: "Service A", NodeID: "node-a", ProjectID: "project-a", EndpointKey: "svc_a_endpoint"},
 		},
 	}
-	aggregator := NewAggregator(&cfg, store, NewGatusClient(gatus.URL), 10*time.Second)
+	aggregator := NewAggregatorWithRuntime(&cfg, store, NewGatusClient(gatus.URL), 10*time.Second, RuntimeSettings{
+		BuildCommit: "abc1234",
+		BuildTime:   "2026-06-10T06:00:00Z",
+	})
 	if _, err := aggregator.Summary(context.Background()); err != nil {
 		t.Fatalf("summary: %v", err)
 	}
@@ -1619,6 +1622,9 @@ func TestDiagnosticsIncludesRuntimeStoreAndCache(t *testing.T) {
 	}
 	if diag.Runtime.GoVersion == "" || diag.Runtime.Goroutines <= 0 || diag.Runtime.Memory.SysBytes == 0 {
 		t.Fatalf("runtime = %#v, want go version, goroutines, and memory", diag.Runtime)
+	}
+	if diag.Runtime.Build.Commit != "abc1234" || diag.Runtime.Build.BuiltAt != "2026-06-10T06:00:00Z" {
+		t.Fatalf("runtime build = %#v, want configured build metadata", diag.Runtime.Build)
 	}
 	if !diag.Runtime.SummaryCache.Cached || diag.Runtime.SummaryCache.TTLSeconds != 10 || diag.Runtime.SummaryCache.SecondsUntilExpiry <= 0 {
 		t.Fatalf("summary cache = %#v, want warm cache with 10s ttl", diag.Runtime.SummaryCache)

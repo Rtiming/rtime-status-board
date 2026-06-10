@@ -23,6 +23,8 @@ services:
       STATUS_BOARD_PUBLIC_DOMAIN: ${STATUS_BOARD_PUBLIC_DOMAIN:-status.example.com}
       STATUS_BOARD_PUBLIC_IP: ${STATUS_BOARD_PUBLIC_IP:-203.0.113.10}
       STATUS_BOARD_TAILNET_URL: ${STATUS_BOARD_TAILNET_URL:-http://100.64.10.5:18083}
+      STATUS_BOARD_BUILD_COMMIT: ${STATUS_BOARD_BUILD_COMMIT:-unknown}
+      STATUS_BOARD_BUILD_TIME: ${STATUS_BOARD_BUILD_TIME:-unknown}
     network_mode: host
     volumes:
       - status_data:/data

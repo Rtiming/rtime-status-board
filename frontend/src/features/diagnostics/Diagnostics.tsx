@@ -392,6 +392,10 @@ export function Diagnostics({
             <strong>{runtime.go_version || '-'}</strong>
             <span>{t.goroutines}</span>
             <strong>{formatCount(runtime.goroutines)}</strong>
+            <span>{t.buildCommit}</span>
+            <strong>{runtime.build?.commit || '-'}</strong>
+            <span>{t.buildTime}</span>
+            <strong>{runtime.build?.built_at ? formatTime(runtime.build.built_at) : '-'}</strong>
             <span>{t.heap}</span>
             <strong>{formatBytes(runtime.memory.heap_alloc_bytes)}</strong>
             <span>{t.processMemory}</span>

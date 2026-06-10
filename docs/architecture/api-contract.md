@@ -148,8 +148,9 @@ attention, such as a missing configured container or memory/CPU over budget.
 
 `/api/v1/diagnostics.runtime` exposes status-board self-observability without a
 new collector: process uptime, Go version, goroutine count, Go memory stats,
-summary cache TTL/expiry, SQLite database size/row-count/retention data, and
-bounded in-memory API request diagnostics. `runtime.requests` includes total
+build commit/time from the runtime environment, summary cache TTL/expiry,
+SQLite database size/row-count/retention data, and bounded in-memory API
+request diagnostics. `runtime.requests` includes total
 requests since process start, status-class counts, slow-request count,
 recent-sample P95/max latency, latest samples, and normalized route totals such
 as `GET /api/v1/nodes/:id/metrics`. It deliberately stores normalized route

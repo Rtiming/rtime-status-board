@@ -73,6 +73,8 @@ func main() {
 		PublicDomain:     env("STATUS_BOARD_PUBLIC_DOMAIN", ""),
 		PublicIP:         env("STATUS_BOARD_PUBLIC_IP", ""),
 		TailnetStatusURL: env("STATUS_BOARD_TAILNET_URL", ""),
+		BuildCommit:      env("STATUS_BOARD_BUILD_COMMIT", ""),
+		BuildTime:        env("STATUS_BOARD_BUILD_TIME", ""),
 	})
 	server := app.NewServer(app.ServerOptions{
 		Config:         cfg,

@@ -61,18 +61,22 @@ read_env_value() {
 PUBLIC_DOMAIN="$(read_env_value STATUS_BOARD_PUBLIC_DOMAIN)"
 PUBLIC_IP="$(read_env_value STATUS_BOARD_PUBLIC_IP)"
 TAILNET_STATUS_URL="$(read_env_value STATUS_BOARD_TAILNET_URL)"
+BUILD_COMMIT="${STATUS_BOARD_BUILD_COMMIT:-$(git -C "$ROOT" rev-parse --short HEAD 2>/dev/null || printf "unknown")}"
+BUILD_TIME="${STATUS_BOARD_BUILD_TIME:-$(date -u +%Y-%m-%dT%H:%M:%SZ)}"
 
-public_env_script="$(cat <<'REMOTE'
+metadata_env_script="$(cat <<'REMOTE'
 set -euo pipefail
 cd "$REMOTE_DIR"
 env_file=".env.production"
-backup="$env_file.bak.public.$(date +%Y%m%d-%H%M%S)"
+backup="$env_file.bak.metadata.$(date +%Y%m%d-%H%M%S)"
 tmp="$(mktemp)"
 cp -p "$env_file" "$backup"
 awk -F= '
   $1 == "STATUS_BOARD_PUBLIC_DOMAIN" { next }
   $1 == "STATUS_BOARD_PUBLIC_IP" { next }
   $1 == "STATUS_BOARD_TAILNET_URL" { next }
+  $1 == "STATUS_BOARD_BUILD_COMMIT" { next }
+  $1 == "STATUS_BOARD_BUILD_TIME" { next }
   { print }
 ' "$env_file" >"$tmp"
 changed=()
@@ -88,22 +92,24 @@ append_if_real() {
 append_if_real STATUS_BOARD_PUBLIC_DOMAIN "$STATUS_BOARD_PUBLIC_DOMAIN" "status.example.com"
 append_if_real STATUS_BOARD_PUBLIC_IP "$STATUS_BOARD_PUBLIC_IP" "203.0.113.10"
 append_if_real STATUS_BOARD_TAILNET_URL "$STATUS_BOARD_TAILNET_URL" "http://100.64.10.5:18083"
+append_if_real STATUS_BOARD_BUILD_COMMIT "$STATUS_BOARD_BUILD_COMMIT" "unknown"
+append_if_real STATUS_BOARD_BUILD_TIME "$STATUS_BOARD_BUILD_TIME" "unknown"
 if [[ "${#changed[@]}" -gt 0 ]]; then
   cat "$tmp" >"$env_file"
   chmod 600 "$env_file"
-  printf "[OK] Synced remote public env metadata keys:"
+  printf "[OK] Synced remote non-sensitive env metadata keys:"
   printf " %s" "${changed[@]}"
   printf "\n"
   printf "[INFO] Remote env backup: %s/%s\n" "$REMOTE_DIR" "$backup"
 else
   rm -f "$backup"
-  printf "[INFO] No real public env metadata keys found in local %s; remote env left without public metadata sync\n" "$STATUS_BOARD_ENV_FILE"
+  printf "[INFO] No non-sensitive env metadata keys found in local %s; remote env left without metadata sync\n" "$STATUS_BOARD_ENV_FILE"
 fi
 rm -f "$tmp"
 REMOTE
 )"
 "$RTIME_SSH" "$REMOTE_NODE" \
-  "REMOTE_DIR=$(printf "%q" "$REMOTE_DIR") STATUS_BOARD_ENV_FILE=$(printf "%q" "$STATUS_BOARD_ENV_FILE") STATUS_BOARD_PUBLIC_DOMAIN=$(printf "%q" "$PUBLIC_DOMAIN") STATUS_BOARD_PUBLIC_IP=$(printf "%q" "$PUBLIC_IP") STATUS_BOARD_TAILNET_URL=$(printf "%q" "$TAILNET_STATUS_URL") bash -lc $(printf "%q" "$public_env_script")"
+  "REMOTE_DIR=$(printf "%q" "$REMOTE_DIR") STATUS_BOARD_ENV_FILE=$(printf "%q" "$STATUS_BOARD_ENV_FILE") STATUS_BOARD_PUBLIC_DOMAIN=$(printf "%q" "$PUBLIC_DOMAIN") STATUS_BOARD_PUBLIC_IP=$(printf "%q" "$PUBLIC_IP") STATUS_BOARD_TAILNET_URL=$(printf "%q" "$TAILNET_STATUS_URL") STATUS_BOARD_BUILD_COMMIT=$(printf "%q" "$BUILD_COMMIT") STATUS_BOARD_BUILD_TIME=$(printf "%q" "$BUILD_TIME") bash -lc $(printf "%q" "$metadata_env_script")"
 
 if ! "$RTIME_SSH" "$REMOTE_NODE" "docker compose version >/dev/null 2>&1"; then
   echo "[ERROR] docker compose plugin is missing on $REMOTE_NODE."

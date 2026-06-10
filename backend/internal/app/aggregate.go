@@ -1413,6 +1413,10 @@ func (a *Aggregator) runtimeDiagnostic(now time.Time, store StoreDiagnostic) Run
 		UptimeSeconds: now.Sub(a.startedAt).Seconds(),
 		GoVersion:     runtime.Version(),
 		Goroutines:    runtime.NumGoroutine(),
+		Build: RuntimeBuildDiagnostic{
+			Commit:  strings.TrimSpace(a.runtime.BuildCommit),
+			BuiltAt: strings.TrimSpace(a.runtime.BuildTime),
+		},
 		Memory: RuntimeMemoryDiagnostic{
 			AllocBytes:     mem.Alloc,
 			SysBytes:       mem.Sys,

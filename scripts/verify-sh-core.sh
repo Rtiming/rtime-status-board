@@ -344,6 +344,19 @@ nodes = get("/api/v1/nodes")
 projects = get("/api/v1/projects")
 services = get("/api/v1/services")
 
+def env_value(key):
+    try:
+        for raw in open(".env.production", "r", encoding="utf-8"):
+            line = raw.strip()
+            if not line or line.startswith("#") or "=" not in line:
+                continue
+            left, right = line.split("=", 1)
+            if left.strip() == key:
+                return right.strip().strip('"').strip("'")
+    except FileNotFoundError:
+        return ""
+    return ""
+
 deployment_diag = diagnostics.get("deployment") or {}
 if deployment_diag.get("status") != "ok":
     raise SystemExit(f"deployment diagnostics not ok: {deployment_diag}")
@@ -355,7 +368,20 @@ for key in ("tailnet-health", "public-http-auth", "public-https-auth", "public-d
     if row.get("status") != "ok":
         raise SystemExit(f"deployment diagnostic {key} is not ok: {row}")
 
-request_diag = ((diagnostics.get("runtime") or {}).get("requests") or {})
+runtime_diag = diagnostics.get("runtime") or {}
+build_diag = runtime_diag.get("build") or {}
+expected_build_commit = env_value("STATUS_BOARD_BUILD_COMMIT")
+expected_build_time = env_value("STATUS_BOARD_BUILD_TIME")
+if not build_diag.get("commit") or build_diag.get("commit") == "unknown":
+    raise SystemExit(f"runtime build commit missing or unknown: {build_diag}")
+if not build_diag.get("built_at") or build_diag.get("built_at") == "unknown":
+    raise SystemExit(f"runtime build time missing or unknown: {build_diag}")
+if expected_build_commit and expected_build_commit != "unknown" and build_diag.get("commit") != expected_build_commit:
+    raise SystemExit(f"runtime build commit mismatch: diagnostics={build_diag.get('commit')} env={expected_build_commit}")
+if expected_build_time and expected_build_time != "unknown" and build_diag.get("built_at") != expected_build_time:
+    raise SystemExit(f"runtime build time mismatch: diagnostics={build_diag.get('built_at')} env={expected_build_time}")
+
+request_diag = runtime_diag.get("requests") or {}
 if request_diag.get("total", 0) < 1:
     raise SystemExit(f"runtime request diagnostics did not record prior API traffic: {request_diag}")
 for key in ("status_counts", "slow_threshold_ms", "recent_sample_limit", "recent_p95_duration_ms", "routes"):
@@ -423,6 +449,7 @@ print(f"  collector summaries: {len(collector_summary)}")
 print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_names)}")
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
 print(f"  API requests observed: {request_diag.get('total')} routes={len(request_diag.get('routes') or [])}")
+print(f"  build: {build_diag.get('commit')} {build_diag.get('built_at')}")
 
 failures = diagnostics.get("failures") or []
 if failures:
