@@ -8,7 +8,8 @@ GO_PROXY="${GO_PROXY:-https://goproxy.cn,direct}"
 GO_STEP_TIMEOUT_SECONDS="${GO_STEP_TIMEOUT_SECONDS:-600}"
 REMOTE_GO_CACHE_DIR="${REMOTE_GO_CACHE_DIR:-/tmp/rtime-status-board-go-cache}"
 BUILD_CONTAINER="rsb-prod-backend-build-$$"
-COMPOSE=(env COMPOSE_BAKE=false docker compose -p "$PROJECT_NAME" -f compose.prod.yml --env-file .env.production)
+STATUSD_IMAGE="${STATUSD_IMAGE:-rtime-status-board/statusd:local}"
+COMPOSE=(docker compose -p "$PROJECT_NAME" -f compose.prod.yml --env-file .env.production)
 
 case "$ACTION" in
   up|logs|ps|down) ;;
@@ -63,13 +64,19 @@ run_backend_build() {
   chown "$(id -u):$(id -g)" dist/statusd-linux-amd64 >/dev/null 2>&1 || true
 }
 
+build_runtime_image() {
+  echo "[REMOTE] docker build runtime image"
+  docker build -f Dockerfile.runtime -t "$STATUSD_IMAGE" .
+}
+
 case "$ACTION" in
   up)
     run_backend_build
     echo "[REMOTE] docker compose config"
     "${COMPOSE[@]}" config >/tmp/rtime-status-board.prod.compose.yml
-    echo "[REMOTE] docker compose up -d --build"
-    "${COMPOSE[@]}" up -d --build
+    build_runtime_image
+    echo "[REMOTE] docker compose up -d"
+    "${COMPOSE[@]}" up -d
     echo "[REMOTE] docker compose ps"
     "${COMPOSE[@]}" ps
     ;;
