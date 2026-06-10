@@ -8,7 +8,7 @@ GO_PROXY="${GO_PROXY:-https://goproxy.cn,direct}"
 GO_STEP_TIMEOUT_SECONDS="${GO_STEP_TIMEOUT_SECONDS:-600}"
 REMOTE_GO_CACHE_DIR="${REMOTE_GO_CACHE_DIR:-/tmp/rtime-status-board-go-cache}"
 BUILD_CONTAINER="rsb-prod-backend-build-$$"
-COMPOSE=(docker compose -p "$PROJECT_NAME" -f compose.prod.yml --env-file .env.production)
+COMPOSE=(env COMPOSE_BAKE=false docker compose -p "$PROJECT_NAME" -f compose.prod.yml --env-file .env.production)
 
 case "$ACTION" in
   up|logs|ps|down) ;;
