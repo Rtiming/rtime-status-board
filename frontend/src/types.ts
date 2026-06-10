@@ -479,6 +479,8 @@ export interface ProjectDiagnostic {
   last_check_at?: string;
   recent_event_count: number;
   last_event_at?: string;
+  recent_event_kind_counts: EventKindCount[];
+  recent_event_status_counts: StatusCounts;
   ops_status: Status;
   ops_issue_count: number;
   ops_error_count: number;

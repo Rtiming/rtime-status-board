@@ -713,33 +713,14 @@ func eventLogDiagnostic(total int, events []Event) EventLogDiagnostic {
 	kindCounts := map[string]int{}
 	for _, event := range events {
 		kindCounts[event.Kind]++
-		switch event.To {
-		case StatusOK:
-			diag.StatusCounts.OK++
-		case StatusDegraded:
-			diag.StatusCounts.Degraded++
-		case StatusDown:
-			diag.StatusCounts.Down++
-		case StatusMaintenance:
-			diag.StatusCounts.Maintenance++
-		default:
-			diag.StatusCounts.Unknown++
-		}
+		incrementStatusCounts(&diag.StatusCounts, event.To)
 		if event.CreatedAt.After(latest) {
 			latest = event.CreatedAt
 			diag.LatestAt = &latest
 		}
 	}
 
-	kinds := make([]string, 0, len(kindCounts))
-	for kind := range kindCounts {
-		kinds = append(kinds, kind)
-	}
-	sort.Strings(kinds)
-	diag.KindCounts = make([]EventKindCount, 0, len(kinds))
-	for _, kind := range kinds {
-		diag.KindCounts = append(diag.KindCounts, EventKindCount{Kind: kind, Count: kindCounts[kind]})
-	}
+	diag.KindCounts = eventKindCounts(kindCounts)
 	return diag
 }
 
@@ -850,7 +831,11 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 		if endpointLatencyCount > 0 {
 			diag.CurrentAvgResponseMS = float64(endpointLatencyTotal) / float64(endpointLatencyCount)
 		}
-		diag.RecentEventCount, diag.LastEventAt = projectEventSummary(project.ID, serviceSet, nodeSet, events)
+		eventSummary := projectEventSummary(project.ID, serviceSet, nodeSet, events)
+		diag.RecentEventCount = eventSummary.Count
+		diag.LastEventAt = eventSummary.LatestAt
+		diag.RecentEventKindCounts = eventSummary.KindCounts
+		diag.RecentEventStatusCounts = eventSummary.StatusCounts
 		diag.MetricsReportingNodes = sortedKeys(metricsReporting)
 		diag.MetricsMissingNodes = sortedKeys(metricsMissing)
 		diag.MetricsStaleNodes = sortedKeys(metricsStale)
@@ -900,9 +885,17 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 	return diagnostics
 }
 
-func projectEventSummary(projectID string, serviceSet map[string]bool, nodeSet map[string]bool, events []Event) (int, *time.Time) {
-	count := 0
+type projectEventSummaryResult struct {
+	Count        int
+	LatestAt     *time.Time
+	KindCounts   []EventKindCount
+	StatusCounts StatusCounts
+}
+
+func projectEventSummary(projectID string, serviceSet map[string]bool, nodeSet map[string]bool, events []Event) projectEventSummaryResult {
+	summary := projectEventSummaryResult{}
 	var latest time.Time
+	kindCounts := map[string]int{}
 	for _, event := range events {
 		matched := false
 		switch event.Kind {
@@ -916,16 +909,47 @@ func projectEventSummary(projectID string, serviceSet map[string]bool, nodeSet m
 		if !matched {
 			continue
 		}
-		count++
+		summary.Count++
+		kindCounts[event.Kind]++
+		incrementStatusCounts(&summary.StatusCounts, event.To)
 		if event.CreatedAt.After(latest) {
 			latest = event.CreatedAt
 		}
 	}
-	if latest.IsZero() {
-		return count, nil
+	summary.KindCounts = eventKindCounts(kindCounts)
+	if !latest.IsZero() {
+		lastEvent := latest
+		summary.LatestAt = &lastEvent
 	}
-	lastEvent := latest
-	return count, &lastEvent
+	return summary
+}
+
+func eventKindCounts(kindCounts map[string]int) []EventKindCount {
+	kinds := make([]string, 0, len(kindCounts))
+	for kind := range kindCounts {
+		kinds = append(kinds, kind)
+	}
+	sort.Strings(kinds)
+	counts := make([]EventKindCount, 0, len(kinds))
+	for _, kind := range kinds {
+		counts = append(counts, EventKindCount{Kind: kind, Count: kindCounts[kind]})
+	}
+	return counts
+}
+
+func incrementStatusCounts(counts *StatusCounts, status Status) {
+	switch status {
+	case StatusOK:
+		counts.OK++
+	case StatusDegraded:
+		counts.Degraded++
+	case StatusDown:
+		counts.Down++
+	case StatusMaintenance:
+		counts.Maintenance++
+	default:
+		counts.Unknown++
+	}
 }
 
 func projectDiagnosticStatus(diag ProjectDiagnostic, projectStatus Status) Status {

@@ -194,6 +194,9 @@ Current implementation status:
   counts, failure percentage, endpoints without recent logs, and current
   average/max response time. It is computed from the same already-loaded Gatus
   endpoint status rows.
+- Project coverage rows also summarize related status-log activity by event
+  kind and target status, computed from the same bounded SQLite event rows
+  already loaded for Diagnostics.
 - The same project coverage rows also include the matching Ops impact rollup:
   `ops_status`, severity counts, issue kinds, affected nodes/services, and
   detail. This keeps project rows tied to the action-oriented Ops digest without

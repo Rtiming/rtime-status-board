@@ -207,11 +207,12 @@ endpoint counts, related nodes, and which related nodes are reporting, missing,
 or stale in the latest metrics-agent view. It also includes recent check count,
 recent success/failure counts, failure percentage, check coverage percentage,
 mapped endpoints without recent check logs, current average/max response time,
-latest check time, recent related event count, and latest event time. Each row
+latest check time, recent related event count, latest event time, event kind
+counts, and target-status counts for the related bounded status log. Each row
 also embeds the matching `ops.project_impacts` rollup fields as `ops_status`,
-severity counts, issue kinds, affected nodes/services, and `ops_detail`, keeping
-project troubleshooting in one table without changing the primary project
-service-check status. It reuses the diagnostics request's already-loaded
+severity counts, issue kinds, affected nodes/services, and `ops_detail`,
+keeping project troubleshooting in one table without changing the primary
+project service-check status. It reuses the diagnostics request's already-loaded
 services, endpoint statuses, recent SQLite events, metrics freshness data, and
 Ops issue rollup.
 

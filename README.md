@@ -350,7 +350,10 @@ missing endpoint coverage, related nodes, and metric-report coverage per
 project. It also summarizes recent Gatus check rows, success/failure counts,
 failure rate, mapped endpoints without recent logs, current average/max response
 time, latest check time, related status-change events, and latest event time per
-project. It also embeds the matching `ops.project_impacts` rollup fields
+project. The related event summary includes event kind counts and target-status
+counts, so project-level status churn can be attributed to node, service, or
+project transitions without opening the raw log. It also embeds the matching
+`ops.project_impacts` rollup fields
 (`ops_status`, severity counts, issue kinds, affected nodes/services, and
 detail) so a project row can show service-check health and operational impact
 side by side. It performs no additional checks and writes no history.

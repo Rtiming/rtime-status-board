@@ -3,7 +3,15 @@ import { AgentReportRow, Metric, Panel, Row } from '../../shared/components';
 import { formatBytes, formatCount, formatDuration, formatEventKindCounts, formatHeadroomCell, formatLatencyMS, formatList, formatOpsIssue, formatSeconds, formatSignedOpsValue, formatStatusCountSummary, formatThresholdRate, formatTime } from '../../shared/format';
 import { dictionary, type Lang } from '../../shared/i18n';
 import { StatusPill, statusLabel } from '../../shared/status';
-import type { AgentNodeDiagnostic, DiagnosticsResponse, RuntimeEndpointStatus, ServiceResourceBudgetStatus } from '../../types';
+import type { AgentNodeDiagnostic, DiagnosticsResponse, RuntimeEndpointStatus, ServiceResourceBudgetStatus, StatusCounts } from '../../types';
+
+const emptyStatusCounts: StatusCounts = {
+  ok: 0,
+  degraded: 0,
+  down: 0,
+  unknown: 0,
+  maintenance: 0
+};
 
 export function Diagnostics({
   diagnostics,
@@ -181,6 +189,8 @@ export function Diagnostics({
                       <span>{t.currentLatency}: {formatLatencyPair(project.current_avg_response_time_ms, project.current_max_response_time_ms, t.avgLatency, t.maxLatency)}</span>
                       <span>{t.last}: {formatTime(project.last_check_at)}</span>
                       <span>{t.projectRecentEvents}: {project.recent_event_count ?? 0} · {t.last}: {formatTime(project.last_event_at)}</span>
+                      <span>{t.eventKinds}: {formatEventKindCounts(project.recent_event_kind_counts ?? [])}</span>
+                      <span>{t.statusTargets}: {formatStatusCountSummary(project.recent_event_status_counts ?? emptyStatusCounts, lang)}</span>
                     </td>
                     <td>
                       <StatusPill status={project.ops_status ?? 'ok'} lang={lang} />

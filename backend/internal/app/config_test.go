@@ -352,10 +352,10 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 		{Key: "endpoint-ok", RecentResults: 3, RecentFailures: 0, ResponseTimeMS: 12, LastCheckedAt: base.Add(-2 * time.Minute)},
 		{Key: "endpoint-down", RecentResults: 4, RecentFailures: 2, ResponseTimeMS: 80, LastCheckedAt: base},
 	}, []Event{
-		{Kind: "project", SubjectID: "project-a", CreatedAt: base.Add(-5 * time.Minute)},
-		{Kind: "service", SubjectID: "svc-down", CreatedAt: base.Add(-3 * time.Minute)},
-		{Kind: "node", SubjectID: "node-a", CreatedAt: base.Add(-time.Minute)},
-		{Kind: "project", SubjectID: "other-project", CreatedAt: base},
+		{Kind: "project", SubjectID: "project-a", To: StatusOK, CreatedAt: base.Add(-5 * time.Minute)},
+		{Kind: "service", SubjectID: "svc-down", To: StatusDown, CreatedAt: base.Add(-3 * time.Minute)},
+		{Kind: "node", SubjectID: "node-a", To: StatusDegraded, CreatedAt: base.Add(-time.Minute)},
+		{Kind: "project", SubjectID: "other-project", To: StatusMaintenance, CreatedAt: base},
 	}, []OpsProjectImpact{
 		{
 			ProjectID:        "project-a",
@@ -405,6 +405,12 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 	}
 	if row.RecentEventCount != 3 || row.LastEventAt == nil || !row.LastEventAt.Equal(base.Add(-time.Minute)) {
 		t.Fatalf("recent event summary = %#v, want 3 related events and latest node event", row)
+	}
+	if len(row.RecentEventKindCounts) != 3 || row.RecentEventKindCounts[0] != (EventKindCount{Kind: "node", Count: 1}) || row.RecentEventKindCounts[1] != (EventKindCount{Kind: "project", Count: 1}) || row.RecentEventKindCounts[2] != (EventKindCount{Kind: "service", Count: 1}) {
+		t.Fatalf("recent event kind counts = %#v, want node/project/service counts", row.RecentEventKindCounts)
+	}
+	if row.RecentEventStatusCounts.OK != 1 || row.RecentEventStatusCounts.Degraded != 1 || row.RecentEventStatusCounts.Down != 1 || row.RecentEventStatusCounts.Maintenance != 0 {
+		t.Fatalf("recent event status counts = %#v, want ok/degraded/down related event targets", row.RecentEventStatusCounts)
 	}
 	if row.OpsStatus != StatusDegraded || row.OpsIssueCount != 2 || row.OpsWarnCount != 2 || row.OpsErrorCount != 0 {
 		t.Fatalf("ops impact = %#v, want degraded project impact with two warnings", row)
