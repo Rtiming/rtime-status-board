@@ -309,6 +309,18 @@ nodes = get("/api/v1/nodes")
 projects = get("/api/v1/projects")
 services = get("/api/v1/services")
 
+request_diag = ((diagnostics.get("runtime") or {}).get("requests") or {})
+if request_diag.get("total", 0) < 1:
+    raise SystemExit(f"runtime request diagnostics did not record prior API traffic: {request_diag}")
+for key in ("status_counts", "slow_threshold_ms", "recent_sample_limit", "recent_p95_duration_ms", "routes"):
+    if key not in request_diag:
+        raise SystemExit(f"runtime request diagnostics missing {key}: {request_diag}")
+if (request_diag.get("status_counts") or {}).get("success", 0) < 1:
+    raise SystemExit(f"runtime request diagnostics missing successful request count: {request_diag}")
+route_keys = {f"{route.get('method')} {route.get('route')}" for route in request_diag.get("routes") or []}
+if "GET /api/v1/health" not in route_keys:
+    raise SystemExit(f"runtime request diagnostics missing health route: {request_diag.get('routes')}")
+
 if schema.get("version") != 2:
     raise SystemExit(f"telemetry schema version = {schema.get('version')}, want 2")
 
@@ -354,6 +366,7 @@ print(f"  metrics nodes: {len(metrics)}")
 print(f"  collector summaries: {len(collector_summary)}")
 print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_names)}")
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
+print(f"  API requests observed: {request_diag.get('total')} routes={len(request_diag.get('routes') or [])}")
 
 failures = diagnostics.get("failures") or []
 if failures:

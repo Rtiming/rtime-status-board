@@ -381,6 +381,7 @@ type RuntimeDiagnostic struct {
 	Memory        RuntimeMemoryDiagnostic `json:"memory"`
 	SummaryCache  SummaryCacheDiagnostic  `json:"summary_cache"`
 	Store         StoreDiagnostic         `json:"store"`
+	Requests      APIRequestDiagnostic    `json:"requests"`
 }
 
 type RuntimeSettings struct {
@@ -497,6 +498,51 @@ type StoreDiagnostic struct {
 	MetricsRetentionDays   float64    `json:"metrics_retention_days"`
 	ReportLogRetentionDays float64    `json:"report_log_retention_days"`
 	ReportLogLimit         int        `json:"report_log_limit"`
+}
+
+type APIRequestDiagnostic struct {
+	Since               time.Time                   `json:"since,omitempty"`
+	Total               int64                       `json:"total"`
+	StatusCounts        APIRequestStatusCounts      `json:"status_counts"`
+	SlowThresholdMS     float64                     `json:"slow_threshold_ms"`
+	SlowCount           int64                       `json:"slow_count"`
+	AvgDurationMS       float64                     `json:"avg_duration_ms"`
+	MaxDurationMS       float64                     `json:"max_duration_ms"`
+	RecentSampleLimit   int                         `json:"recent_sample_limit"`
+	RecentP95DurationMS float64                     `json:"recent_p95_duration_ms"`
+	RecentMaxDurationMS float64                     `json:"recent_max_duration_ms"`
+	Recent              []APIRequestSample          `json:"recent"`
+	Routes              []APIRequestRouteDiagnostic `json:"routes"`
+}
+
+type APIRequestStatusCounts struct {
+	Success     int64 `json:"success"`
+	Redirect    int64 `json:"redirect"`
+	ClientError int64 `json:"client_error"`
+	ServerError int64 `json:"server_error"`
+	Other       int64 `json:"other"`
+}
+
+type APIRequestSample struct {
+	Method     string    `json:"method"`
+	Route      string    `json:"route"`
+	Status     int       `json:"status"`
+	Bytes      int64     `json:"bytes"`
+	DurationMS float64   `json:"duration_ms"`
+	At         time.Time `json:"at"`
+}
+
+type APIRequestRouteDiagnostic struct {
+	Method         string                 `json:"method"`
+	Route          string                 `json:"route"`
+	Total          int64                  `json:"total"`
+	StatusCounts   APIRequestStatusCounts `json:"status_counts"`
+	AvgDurationMS  float64                `json:"avg_duration_ms"`
+	MaxDurationMS  float64                `json:"max_duration_ms"`
+	SlowCount      int64                  `json:"slow_count"`
+	LastStatus     int                    `json:"last_status"`
+	LastDurationMS float64                `json:"last_duration_ms"`
+	LastSeenAt     time.Time              `json:"last_seen_at,omitempty"`
 }
 
 type OpsDiagnostic struct {

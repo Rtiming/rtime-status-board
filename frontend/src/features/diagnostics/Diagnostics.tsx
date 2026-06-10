@@ -1,6 +1,6 @@
 import { Activity, Clock, Gauge, ListChecks, RefreshCw, Server, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { AgentReportRow, Metric, Panel, Row } from '../../shared/components';
-import { formatBytes, formatCount, formatDuration, formatEventKindCounts, formatHeadroomCell, formatList, formatOpsIssue, formatSeconds, formatStatusCountSummary, formatThresholdRate, formatTime } from '../../shared/format';
+import { formatBytes, formatCount, formatDuration, formatEventKindCounts, formatHeadroomCell, formatLatencyMS, formatList, formatOpsIssue, formatSeconds, formatStatusCountSummary, formatThresholdRate, formatTime } from '../../shared/format';
 import { dictionary, type Lang } from '../../shared/i18n';
 import { StatusPill, statusLabel } from '../../shared/status';
 import type { AgentNodeDiagnostic, DiagnosticsResponse, RuntimeEndpointStatus } from '../../types';
@@ -38,6 +38,7 @@ export function Diagnostics({
   const collectorSummary = diagnostics.metrics.collector_summary ?? [];
   const runtime = diagnostics.runtime;
   const store = runtime?.store;
+  const requests = runtime?.requests;
   const deployment = diagnostics.deployment;
   const projectDiagnostics = diagnostics.projects ?? [];
   const opsIssues = diagnostics.ops?.issues ?? [];
@@ -382,7 +383,55 @@ export function Diagnostics({
             <strong>{`${store.metrics_retention_days}d / ${store.report_log_retention_days}d`}</strong>
             <span>{t.reportLogLimit}</span>
             <strong>{formatCount(store.report_log_limit)}</strong>
+            {requests && (
+              <>
+                <span>{t.apiRequests}</span>
+                <strong>{formatCount(requests.total)}</strong>
+                <span>{t.apiErrors}</span>
+                <strong>{`${formatCount(requests.status_counts.client_error)} / ${formatCount(requests.status_counts.server_error)}`}</strong>
+                <span>{t.apiSlowRequests}</span>
+                <strong>{`${formatCount(requests.slow_count)} >= ${formatLatencyMS(requests.slow_threshold_ms)}`}</strong>
+                <span>{t.apiRecentP95}</span>
+                <strong>{formatLatencyMS(requests.recent_p95_duration_ms)}</strong>
+              </>
+            )}
           </div>
+          {requests && requests.routes.length > 0 && (
+            <>
+              <h3 className="panel-subtitle">{t.apiRoutes}</h3>
+              <div className="inline-table api-routes-table">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>{t.route}</th>
+                      <th>{t.total}</th>
+                      <th>{t.apiErrors}</th>
+                      <th>{t.avgLatency}</th>
+                      <th>{t.maxLatency}</th>
+                      <th>{t.lastStatus}</th>
+                      <th>{t.last}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {requests.routes.slice(0, 10).map((route) => (
+                      <tr key={`${route.method}-${route.route}`}>
+                        <td>
+                          <strong>{route.method} {route.route}</strong>
+                          <span>{route.slow_count > 0 ? `${route.slow_count} ${t.apiSlowRequests}` : '-'}</span>
+                        </td>
+                        <td>{formatCount(route.total)}</td>
+                        <td>{formatCount(route.status_counts.client_error)} / {formatCount(route.status_counts.server_error)}</td>
+                        <td>{formatLatencyMS(route.avg_duration_ms)}</td>
+                        <td>{formatLatencyMS(route.max_duration_ms)}</td>
+                        <td>{route.last_status || '-'}</td>
+                        <td>{formatTime(route.last_seen_at)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </Panel>
       )}
 

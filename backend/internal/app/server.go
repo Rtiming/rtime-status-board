@@ -24,7 +24,8 @@ type ServerOptions struct {
 }
 
 type Server struct {
-	options ServerOptions
+	options      ServerOptions
+	requestStats *APIRequestStats
 }
 
 type loggingResponseWriter struct {
@@ -54,7 +55,7 @@ func NewServer(options ServerOptions) *Server {
 	if options.Logger == nil {
 		options.Logger = slog.Default()
 	}
-	return &Server{options: options}
+	return &Server{options: options, requestStats: NewAPIRequestStats()}
 }
 
 func (s *Server) Router() http.Handler {
@@ -154,6 +155,7 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
+	diagnostics.Runtime.Requests = s.requestStats.Snapshot()
 	s.writeJSON(w, http.StatusOK, diagnostics)
 }
 
@@ -545,6 +547,7 @@ func (s *Server) withLogging(next http.Handler) http.Handler {
 			status = http.StatusOK
 		}
 		duration := time.Since(start)
+		s.requestStats.Record(r.Method, r.URL.Path, status, recorder.bytes, duration, time.Now().UTC())
 		level := slog.LevelInfo
 		if status >= 500 {
 			level = slog.LevelError

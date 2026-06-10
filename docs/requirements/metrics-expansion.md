@@ -125,6 +125,10 @@ Current implementation status:
   Production verification also scans recent status-board container logs for
   fatal/error signatures, improving operations debugging without adding a
   collector or log store.
+- Runtime diagnostics now includes bounded in-memory API request statistics:
+  status-class counts, slow-request count, recent P95/max latency, latest
+  samples, and normalized route totals. It gives interface debugging signals
+  without adding a log store, SQLite writes, or high-cardinality raw paths.
 - Diagnostics now includes deployment-boundary checks for the board runtime
   itself: production mode, reserved localhost ports, Gatus URL, config/data/
   frontend paths, frontend artifact readability, cache TTL, retention, SQLite

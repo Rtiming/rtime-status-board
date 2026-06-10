@@ -144,9 +144,13 @@ attention, such as a missing configured container or memory/CPU over budget.
 
 `/api/v1/diagnostics.runtime` exposes status-board self-observability without a
 new collector: process uptime, Go version, goroutine count, Go memory stats,
-summary cache TTL/expiry, and SQLite database size/row-count/retention data.
-It is intended for deployment and growth debugging, especially keeping sh-core
-resource use small.
+summary cache TTL/expiry, SQLite database size/row-count/retention data, and
+bounded in-memory API request diagnostics. `runtime.requests` includes total
+requests since process start, status-class counts, slow-request count,
+recent-sample P95/max latency, latest samples, and normalized route totals such
+as `GET /api/v1/nodes/:id/metrics`. It deliberately stores normalized route
+patterns rather than query strings or raw request bodies. It is intended for
+deployment and growth debugging, especially keeping sh-core resource use small.
 
 `/api/v1/diagnostics.deployment` exposes low-load deployment-boundary checks for
 the board process. In production it verifies the expected localhost backend
@@ -164,9 +168,11 @@ run inside the app process, including Docker container resource budgets, Nginx
 Basic Auth route checks, production directory hygiene, full node/project/service
 detail API smoke, and bounded check-log smoke for node, project, and service
 drill-down paths. The bounded check-log smoke also verifies the returned
-`summary` object for each sampled path. The verifier also scans recent
-status-board container logs for fatal/error signatures such as panic, traceback,
-fatal, or structured error-level entries.
+`summary` object for each sampled path. It also verifies that
+`runtime.requests` records prior API traffic, status classes, latency summary,
+and normalized route rows. The verifier also scans recent status-board container
+logs for fatal/error signatures such as panic, traceback, fatal, or structured
+error-level entries.
 
 `/api/v1/diagnostics.projects` exposes a low-load project coverage matrix. Each
 row includes project ID/name/status/detail, service and critical-service counts,

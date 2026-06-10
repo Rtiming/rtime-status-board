@@ -144,7 +144,8 @@ containers, status-board container resource budget, expected listening ports,
 Tailnet Nginx health, public Nginx Basic Auth boundaries, health endpoint,
 telemetry schema, metrics agent freshness, collector issues, recent agent
 reports, per-collector coverage, all node/project/service detail endpoints, and
-bounded node/project/service check-log endpoints. It also scans recent
+bounded node/project/service check-log endpoints. It also verifies runtime API
+request diagnostics and scans recent
 status-board container logs for fatal/error signatures. It runs `rtime-doctor`
 by default. To skip
 the broader rtime network doctor during a quick status-board check:
@@ -238,6 +239,10 @@ latency, and latest failure time.
 Backend API request logs are structured and intentionally low-detail: method,
 path, status code, response bytes, and duration in milliseconds. They do not log
 request bodies, query strings, or authorization tokens.
+`/api/v1/diagnostics.runtime.requests` also exposes bounded in-memory API
+request counters, status-class counts, recent latency percentiles, and normalized
+route totals. This is for debugging and tuning only; it is not a long-retention
+access log and does not write request data to SQLite.
 
 Future detail and chart APIs are documented in `docs/architecture/api-contract.md`.
 `/api/v1/nodes/:id` returns a lightweight node detail view assembled from

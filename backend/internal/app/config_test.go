@@ -1300,6 +1300,51 @@ func TestRequestLoggingIncludesStatusAndBytes(t *testing.T) {
 	if !strings.Contains(notFoundLog, "level=WARN") || !strings.Contains(notFoundLog, "status=404") || !strings.Contains(notFoundLog, "path=/api/v1/not-found") {
 		t.Fatalf("not-found log = %q, want WARN status 404 path", notFoundLog)
 	}
+
+	stats := server.requestStats.Snapshot()
+	if stats.Total != 2 || stats.StatusCounts.Success != 1 || stats.StatusCounts.ClientError != 1 {
+		t.Fatalf("request stats = %#v, want one success and one client error", stats)
+	}
+	if len(stats.Routes) != 2 {
+		t.Fatalf("routes = %#v, want health and unmatched routes", stats.Routes)
+	}
+	if stats.RecentP95DurationMS < 0 || stats.RecentMaxDurationMS < 0 {
+		t.Fatalf("request latency stats = %#v, want non-negative values", stats)
+	}
+}
+
+func TestRequestStatsNormalizesRoutesAndBoundsRecentSamples(t *testing.T) {
+	stats := NewAPIRequestStats()
+	stats.recentLimit = 2
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+
+	stats.Record(http.MethodGet, "/api/v1/nodes/sh-core/metrics", http.StatusOK, 100, 25*time.Millisecond, now)
+	stats.Record(http.MethodPost, "/api/v1/metrics/report/v2", http.StatusUnauthorized, 50, 600*time.Millisecond, now.Add(time.Second))
+	stats.Record(http.MethodGet, "/api/v1/projects/rtime-fabric/checks", http.StatusBadGateway, 80, 10*time.Millisecond, now.Add(2*time.Second))
+
+	snapshot := stats.Snapshot()
+	if snapshot.Total != 3 || snapshot.SlowCount != 1 {
+		t.Fatalf("snapshot totals = %#v, want total 3 and one slow request", snapshot)
+	}
+	if snapshot.StatusCounts.Success != 1 || snapshot.StatusCounts.ClientError != 1 || snapshot.StatusCounts.ServerError != 1 {
+		t.Fatalf("status counts = %#v, want 2xx/4xx/5xx counts", snapshot.StatusCounts)
+	}
+	if len(snapshot.Recent) != 2 {
+		t.Fatalf("recent = %d, want bounded 2", len(snapshot.Recent))
+	}
+	routes := map[string]bool{}
+	for _, route := range snapshot.Routes {
+		routes[route.Method+" "+route.Route] = true
+	}
+	for _, want := range []string{
+		"GET /api/v1/nodes/:id/metrics",
+		"POST /api/v1/metrics/report/v2",
+		"GET /api/v1/projects/:id/checks",
+	} {
+		if !routes[want] {
+			t.Fatalf("routes = %#v, missing %s", snapshot.Routes, want)
+		}
+	}
 }
 
 func TestStoreDiagnosticsReportsCountsAndRetention(t *testing.T) {

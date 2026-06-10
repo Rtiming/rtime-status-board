@@ -327,6 +327,7 @@ export interface RuntimeDiagnostic {
   memory: RuntimeMemoryDiagnostic;
   summary_cache: SummaryCacheDiagnostic;
   store: StoreDiagnostic;
+  requests?: APIRequestDiagnostic;
 }
 
 export interface RuntimeMemoryDiagnostic {
@@ -361,6 +362,51 @@ export interface StoreDiagnostic {
   metrics_retention_days: number;
   report_log_retention_days: number;
   report_log_limit: number;
+}
+
+export interface APIRequestDiagnostic {
+  since?: string;
+  total: number;
+  status_counts: APIRequestStatusCounts;
+  slow_threshold_ms: number;
+  slow_count: number;
+  avg_duration_ms: number;
+  max_duration_ms: number;
+  recent_sample_limit: number;
+  recent_p95_duration_ms: number;
+  recent_max_duration_ms: number;
+  recent: APIRequestSample[];
+  routes: APIRequestRouteDiagnostic[];
+}
+
+export interface APIRequestStatusCounts {
+  success: number;
+  redirect: number;
+  client_error: number;
+  server_error: number;
+  other: number;
+}
+
+export interface APIRequestSample {
+  method: string;
+  route: string;
+  status: number;
+  bytes: number;
+  duration_ms: number;
+  at: string;
+}
+
+export interface APIRequestRouteDiagnostic {
+  method: string;
+  route: string;
+  total: number;
+  status_counts: APIRequestStatusCounts;
+  avg_duration_ms: number;
+  max_duration_ms: number;
+  slow_count: number;
+  last_status: number;
+  last_duration_ms: number;
+  last_seen_at?: string;
 }
 
 export interface DeploymentDiagnostic {
