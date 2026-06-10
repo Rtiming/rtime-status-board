@@ -1,0 +1,33 @@
+FROM node:25-bookworm AS frontend-builder
+ARG NPM_CONFIG_REGISTRY=
+WORKDIR /src/frontend
+COPY frontend/package*.json ./
+RUN if [ -n "$NPM_CONFIG_REGISTRY" ]; then npm config set registry "$NPM_CONFIG_REGISTRY"; fi && npm install
+COPY frontend/ ./
+RUN npm run build
+
+FROM golang:1.22-bookworm AS backend-builder
+ARG GOPROXY=https://goproxy.cn,direct
+ENV GOPROXY=${GOPROXY}
+WORKDIR /src
+COPY backend/go.mod ./backend/go.mod
+WORKDIR /src/backend
+RUN go mod download
+WORKDIR /src
+COPY backend ./backend
+COPY config ./config
+WORKDIR /src/backend
+RUN CGO_ENABLED=0 go build -o /out/statusd ./cmd/statusd
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y --no-install-recommends ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=backend-builder /out/statusd /usr/local/bin/statusd
+COPY --from=frontend-builder /src/frontend/dist /app/frontend
+COPY config /app/config
+ENV STATUS_BOARD_LISTEN_ADDR=:8080
+ENV STATUS_BOARD_CONFIG=/app/config/status-board.yaml
+ENV STATUS_BOARD_DB_PATH=/data/status-board.db
+ENV STATUS_BOARD_FRONTEND_DIR=/app/frontend
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/statusd"]

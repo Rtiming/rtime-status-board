@@ -1,0 +1,62 @@
+name: rtime-status-board-dev
+
+services:
+  backend:
+    image: golang:1.22-bookworm
+    working_dir: /workspace/backend
+    command: go run ./cmd/statusd -config /workspace/config/status-board.yaml
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      STATUS_BOARD_DEPLOYMENT_MODE: development
+      STATUS_BOARD_LISTEN_ADDR: ":8080"
+      STATUS_BOARD_DB_PATH: /workspace/data/status-board.dev.db
+      STATUS_BOARD_GATUS_URL: http://gatus:8080
+      STATUS_BOARD_CACHE_TTL: ${STATUS_BOARD_CACHE_TTL:-10s}
+      STATUS_BOARD_METRICS_RETENTION: ${STATUS_BOARD_METRICS_RETENTION:-30d}
+      STATUS_BOARD_FRONTEND_DIR: /workspace/frontend/dist
+      STATUS_BOARD_HEARTBEAT_TOKEN: ${STATUS_BOARD_HEARTBEAT_TOKEN:-change-me}
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:${STATUS_BOARD_PORT:-23180}:8080"
+    volumes:
+      - .:/workspace
+    depends_on:
+      - gatus
+
+  frontend:
+    image: node:25-bookworm
+    working_dir: /workspace/frontend
+    command: sh -lc "npm install && npm run dev -- --host 0.0.0.0"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+    ports:
+      - "127.0.0.1:23182:5173"
+    volumes:
+      - .:/workspace
+      - frontend_node_modules:/workspace/frontend/node_modules
+    depends_on:
+      - backend
+
+  gatus:
+    image: ${GATUS_IMAGE:-twinproduction/gatus:latest}
+    cap_add:
+      - NET_RAW
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      GATUS_CONFIG_PATH: /config/config.yaml
+      GATUS_LOG_LEVEL: INFO
+      GATUS_WEB_ADDRESS: 0.0.0.0
+      GATUS_WEB_PORT: 8080
+      STATUS_BOARD_HOST_TARGET: host.docker.internal
+      STATUS_BOARD_API_TARGET: host.docker.internal:23180
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    ports:
+      - "127.0.0.1:${GATUS_PORT:-23181}:8080"
+    volumes:
+      - ./deploy/gatus/config.yaml:/config/config.yaml:ro
+      - ./data/gatus-dev:/data
+
+volumes:
+  frontend_node_modules:

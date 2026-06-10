@@ -1,0 +1,76 @@
+storage:
+  type: sqlite
+  path: /data/gatus.db
+
+metrics: true
+concurrency: 3
+
+web:
+  address: ${GATUS_WEB_ADDRESS}
+  port: ${GATUS_WEB_PORT}
+
+client:
+  timeout: 8s
+
+endpoints:
+  - name: core-ping
+    group: nodes
+    url: "tcp://100.64.10.5:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: core-ssh
+    group: nodes
+    url: "tcp://100.64.10.5:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: status-board-api
+    group: core
+    url: "http://${STATUS_BOARD_API_TARGET}/api/v1/health"
+    interval: 1m
+    conditions:
+      - "[STATUS] == 200"
+      - "[BODY].ok == true"
+  - name: proxy-ping
+    group: nodes
+    url: "tcp://100.64.10.7:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: storage-ping
+    group: nodes
+    url: "tcp://100.64.10.8:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: storage-ssh
+    group: nodes
+    url: "tcp://100.64.10.8:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: web
+    group: storage
+    url: "http://100.64.10.8:8080/"
+    interval: 5m
+    conditions:
+      - "[STATUS] == 200"
+  - name: gpu-edge-ping
+    group: nodes
+    url: "tcp://100.64.10.11:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: gpu-edge-ssh
+    group: nodes
+    url: "tcp://100.64.10.11:22"
+    interval: 1m
+    conditions:
+      - "[CONNECTED] == true"
+  - name: llm
+    group: gpu-edge
+    url: "tcp://100.64.10.11:11434"
+    interval: 5m
+    conditions:
+      - "[CONNECTED] == true"

@@ -1,0 +1,11 @@
+FROM alpine:latest
+WORKDIR /app
+COPY dist/statusd-linux-amd64 /usr/local/bin/statusd
+COPY frontend/dist /app/frontend
+COPY config /app/config
+ENV STATUS_BOARD_LISTEN_ADDR=:8080
+ENV STATUS_BOARD_CONFIG=/app/config/status-board.yaml
+ENV STATUS_BOARD_DB_PATH=/data/status-board.db
+ENV STATUS_BOARD_FRONTEND_DIR=/app/frontend
+EXPOSE 8080
+ENTRYPOINT ["/usr/local/bin/statusd"]

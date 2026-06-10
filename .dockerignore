@@ -1,0 +1,14 @@
+.git/
+.env
+.env.production
+data/
+work/
+coverage/
+frontend/node_modules/
+frontend/.vite/
+backend/bin/
+deploy/**/__pycache__/
+backend/**/__pycache__/
+frontend/**/__pycache__/
+*.pyc
+.DS_Store

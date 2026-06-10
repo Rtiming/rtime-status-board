@@ -1,0 +1,141 @@
+app:
+  name: RTime Status Board
+  description: Example private operations console. Copy this file to status-board.yaml and replace nodes, projects, and services with your own infrastructure.
+
+diagnostics:
+  resource_thresholds:
+    cpu_percent: 90
+    memory_percent: 90
+    root_disk_percent: 85
+    gpu_util_percent: 90
+    network_rx_bps: 52428800
+    network_tx_bps: 52428800
+    storage_read_bps: 104857600
+    storage_write_bps: 104857600
+
+nodes:
+  - id: core
+    name: Core
+    hostname: core.example.internal
+    tailnet_ip: 100.64.10.5
+    location: Primary site
+    role: Control plane, reverse proxy, and status board host
+    tags: [control-plane]
+  - id: proxy
+    name: Proxy
+    hostname: proxy.example.internal
+    tailnet_ip: 100.64.10.7
+    location: Secondary site
+    role: Network proxy and subscription helpers
+    tags: [proxy]
+  - id: storage
+    name: Storage
+    hostname: storage.example.internal
+    tailnet_ip: 100.64.10.8
+    location: Home lab
+    role: Storage, knowledge base, and remote desktop relay
+    tags: [edge, storage]
+  - id: field
+    name: Field Node
+    hostname: field.example.internal
+    tailnet_ip: 100.64.10.10
+    location: Field site
+    role: Residential or movable edge node
+    tags: [edge]
+  - id: gpu-edge
+    name: GPU Edge
+    hostname: gpu-edge.example.internal
+    tailnet_ip: 100.64.10.11
+    location: Lab
+    role: GPU or accelerator development node
+    tags: [edge, gpu]
+
+projects:
+  - id: fabric
+    name: Infrastructure Fabric
+    summary: Tailnet, reverse proxy, and service routing.
+    service_ids: [core-ping, core-ssh, core-status-board-api, proxy-ping]
+  - id: knowledge
+    name: Knowledge Services
+    summary: Storage and knowledge-base services on the storage node.
+    service_ids: [storage-ping, storage-ssh, storage-web]
+  - id: edge
+    name: Edge Development
+    summary: GPU or accelerator development services.
+    service_ids: [gpu-edge-ping, gpu-edge-ssh, gpu-edge-llm]
+
+services:
+  - id: core-ping
+    name: Tailnet reachability
+    node_id: core
+    project_id: fabric
+    kind: tcp
+    endpoint_key: nodes_core-ping
+    critical: true
+  - id: core-ssh
+    name: SSH
+    node_id: core
+    project_id: fabric
+    kind: tcp
+    endpoint_key: nodes_core-ssh
+    critical: true
+  - id: core-status-board-api
+    name: Status board API
+    node_id: core
+    project_id: fabric
+    kind: http
+    endpoint_key: core_status-board-api
+    critical: false
+  - id: proxy-ping
+    name: Proxy reachability
+    node_id: proxy
+    project_id: fabric
+    kind: tcp
+    endpoint_key: nodes_proxy-ping
+    critical: true
+  - id: storage-ping
+    name: Storage reachability
+    node_id: storage
+    project_id: knowledge
+    kind: tcp
+    endpoint_key: nodes_storage-ping
+    critical: true
+  - id: storage-ssh
+    name: SSH
+    node_id: storage
+    project_id: knowledge
+    kind: tcp
+    endpoint_key: nodes_storage-ssh
+    critical: true
+  - id: storage-web
+    name: Knowledge web
+    node_id: storage
+    project_id: knowledge
+    kind: http
+    endpoint_key: storage_web
+    critical: false
+    resource_budget:
+      compose_project: knowledge
+      max_memory_mib: 1536
+      max_cpu_percent: 50
+  - id: gpu-edge-ping
+    name: GPU node reachability
+    node_id: gpu-edge
+    project_id: edge
+    kind: tcp
+    endpoint_key: nodes_gpu-edge-ping
+    critical: true
+  - id: gpu-edge-ssh
+    name: SSH
+    node_id: gpu-edge
+    project_id: edge
+    kind: tcp
+    endpoint_key: nodes_gpu-edge-ssh
+    critical: true
+  - id: gpu-edge-llm
+    name: Local model endpoint
+    node_id: gpu-edge
+    project_id: edge
+    kind: tcp
+    endpoint_key: gpu-edge_llm
+    critical: false

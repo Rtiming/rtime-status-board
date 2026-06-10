@@ -1,0 +1,69 @@
+# Telemetry collection plan. Some runtime knobs are now enforced by statusd
+# through environment variables; richer collector settings remain staged.
+
+version: 1
+
+defaults:
+  latest_stale_after: 2m
+  history_retention: 30d
+  live_window: 1h
+  chart_resolution: 60s
+
+collectors:
+  cpu:
+    enabled: true
+    interval: 60s
+    fields:
+      - total_percent
+      - per_core_percent
+      - load_1_5_15
+      - context_switches
+      - interrupts
+  memory:
+    enabled: true
+    interval: 60s
+    fields:
+      - total
+      - used
+      - available
+      - cache
+      - swap
+  storage:
+    enabled: true
+    interval: 60s
+    fields:
+      - mount_usage
+      - read_bytes_per_sec
+      - write_bytes_per_sec
+      - read_iops
+      - write_iops
+  network:
+    enabled: true
+    interval: 60s
+    fields:
+      - rx_bytes_per_sec
+      - tx_bytes_per_sec
+      - packets
+      - errors
+      - drops
+  gpu:
+    enabled: auto
+    interval: 120s
+    providers:
+      - nvidia-smi
+      - tegrastats
+      - jtop
+    fields:
+      - model
+      - utilization
+      - memory
+      - temperature
+      - power
+  containers:
+    enabled: false
+    interval: 120s
+    provider: docker
+  processes:
+    enabled: false
+    interval: 300s
+    top_n: 5
