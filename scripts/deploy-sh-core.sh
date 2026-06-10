@@ -38,6 +38,16 @@ rsync -az --delete \
   -e "ssh -i $SSH_KEY -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null" \
   "$ROOT/" "$SSH_USER@$SSH_HOST:$REMOTE_DIR/"
 
+cleanup_script="$(cat <<'REMOTE'
+set -euo pipefail
+cd "$REMOTE_DIR"
+rm -rf .git .env data work coverage tmp node_modules frontend/node_modules
+find . -type d -name __pycache__ -prune -exec rm -rf {} +
+find . -type f \( -name '*.pyc' -o -name '.DS_Store' \) -delete
+REMOTE
+)"
+"$RTIME_SSH" "$REMOTE_NODE" "REMOTE_DIR=$(printf "%q" "$REMOTE_DIR") bash -lc $(printf "%q" "$cleanup_script")"
+
 "$RTIME_SSH" "$REMOTE_NODE" "cd '$REMOTE_DIR' && test -f .env.production || cp .env.example .env.production"
 
 if ! "$RTIME_SSH" "$REMOTE_NODE" "docker compose version >/dev/null 2>&1"; then

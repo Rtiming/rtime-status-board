@@ -139,12 +139,13 @@ frontend artifact synced by `make deploy-sh-core`.
 `verify-sh-core` is the production acceptance check. It reads public/Tailnet
 entry values from `.env.production` when present, otherwise falling back to the
 safe example values in this public repo. It verifies the remote
-Compose config, running containers, status-board container resource budget,
-expected listening ports, Tailnet Nginx health, public Nginx Basic Auth
-boundaries, health endpoint, telemetry schema, metrics agent freshness,
-collector issues, recent agent reports, and project check-log endpoints. It
-also runs `rtime-doctor` by default. To skip the broader rtime network doctor
-during a quick status-board check:
+production directory hygiene, remote tree size, Compose config, running
+containers, status-board container resource budget, expected listening ports,
+Tailnet Nginx health, public Nginx Basic Auth boundaries, health endpoint,
+telemetry schema, metrics agent freshness, collector issues, recent agent
+reports, and project check-log endpoints. It also runs `rtime-doctor` by
+default. To skip the broader rtime network doctor during a quick status-board
+check:
 
 ```bash
 RUN_RTIME_DOCTOR=0 make verify-sh-core
@@ -153,13 +154,17 @@ RUN_RTIME_DOCTOR=0 make verify-sh-core
 The default production resource budget is intentionally small: `statusd` must
 stay under `96MiB`, Gatus must stay under `96MiB`, combined status-board memory
 must stay under `150MiB`, and combined one-shot Docker CPU must stay under
-`50%`. These can be overridden for diagnosis or a future larger deployment:
+`50%`. The synced production source tree under `/opt/rtime-status-board` must
+stay under `128MiB` and must not contain local artifacts such as `.git`, `.env`,
+`work/`, `data/`, `node_modules`, caches, or Python bytecode. These can be
+overridden for diagnosis or a future larger deployment:
 
 ```bash
 MAX_STATUSD_MEM_MIB=128 \
 MAX_GATUS_MEM_MIB=128 \
 MAX_COMBINED_MEM_MIB=200 \
 MAX_COMBINED_CPU_PERCENT=60 \
+MAX_REMOTE_TREE_MIB=160 \
 make verify-sh-core
 ```
 

@@ -134,9 +134,12 @@ summary cache TTL, metrics retention, SQLite size budget, configured Tailnet
 entry, configured public IP entry, and public-domain DNS resolution against the
 configured public IP. The public IP entry check is configuration-only;
 the actual unauthenticated `401` boundary is verified by `make verify-sh-core`.
-The checks use runtime settings, local file stat calls, one bounded DNS lookup,
-and existing SQLite diagnostics only; they do not run Docker commands, read
-Docker sockets, or start a collector.
+The in-process diagnostics use runtime settings, local file stat calls, one
+bounded DNS lookup, and existing SQLite diagnostics only; they do not run Docker
+commands, read Docker sockets, or start a collector. The external
+`make verify-sh-core` acceptance script adds host-level checks that should not
+run inside the app process, including Docker container resource budgets, Nginx
+Basic Auth route checks, and production directory hygiene.
 
 `/api/v1/diagnostics.projects` exposes a low-load project coverage matrix. Each
 row includes project ID/name/status/detail, service and critical-service counts,

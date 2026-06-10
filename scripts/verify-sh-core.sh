@@ -9,6 +9,7 @@ MAX_STATUSD_MEM_MIB="${MAX_STATUSD_MEM_MIB:-96}"
 MAX_GATUS_MEM_MIB="${MAX_GATUS_MEM_MIB:-96}"
 MAX_COMBINED_MEM_MIB="${MAX_COMBINED_MEM_MIB:-150}"
 MAX_COMBINED_CPU_PERCENT="${MAX_COMBINED_CPU_PERCENT:-50}"
+MAX_REMOTE_TREE_MIB="${MAX_REMOTE_TREE_MIB:-128}"
 RTIME_SSH="$HOME/.ai-skills/rtime-remote/scripts/rtime-ssh"
 RTIME_DOCTOR="$HOME/.ai-skills/rtime-remote/scripts/rtime-doctor"
 
@@ -33,6 +34,7 @@ TAILNET_STATUS_URL="${TAILNET_STATUS_URL:-http://100.64.10.5:18083}"
 
 echo "[INFO] Verifying $REMOTE_NODE:$REMOTE_DIR"
 echo "[INFO] Resource budget: statusd<=${MAX_STATUSD_MEM_MIB}MiB gatus<=${MAX_GATUS_MEM_MIB}MiB combined<=${MAX_COMBINED_MEM_MIB}MiB cpu<=${MAX_COMBINED_CPU_PERCENT}%"
+echo "[INFO] Remote tree budget: <=${MAX_REMOTE_TREE_MIB}MiB under $REMOTE_DIR"
 echo "[INFO] Public entry target: $STATUS_DOMAIN -> $PUBLIC_IP"
 
 remote_script="$(cat <<'REMOTE'
@@ -46,6 +48,60 @@ PUBLIC_AUTH_FILE="/etc/nginx/.htpasswd-rtime-status-board"
 unset http_proxy HTTP_PROXY https_proxy HTTPS_PROXY all_proxy ALL_PROXY
 export no_proxy="*"
 export NO_PROXY="*"
+
+echo "[REMOTE] production directory hygiene"
+python3 - <<'PY'
+import os
+import subprocess
+from pathlib import Path
+
+root = Path.cwd()
+max_tree_mib = float(os.environ["MAX_REMOTE_TREE_MIB"])
+for required in [
+    "compose.prod.yml",
+    "Dockerfile.runtime",
+    "config/status-board.yaml",
+    "deploy/gatus/config.yaml",
+    ".env.production",
+    "frontend/dist/index.html",
+    "dist/statusd-linux-amd64",
+]:
+    if not (root / required).exists():
+        raise SystemExit(f"missing required production file: {required}")
+
+disallowed_paths = [
+    ".git",
+    ".env",
+    "data",
+    "work",
+    "coverage",
+    "tmp",
+    "node_modules",
+    "frontend/node_modules",
+]
+found = []
+for rel in disallowed_paths:
+    path = root / rel
+    if path.exists():
+        found.append(rel)
+
+for pattern in ("__pycache__",):
+    found.extend(str(path.relative_to(root)) for path in root.rglob(pattern) if path.is_dir())
+found.extend(str(path.relative_to(root)) for path in root.rglob("*.pyc"))
+found.extend(str(path.relative_to(root)) for path in root.rglob(".DS_Store"))
+
+if found:
+    for rel in sorted(set(found)):
+        print(f"  disallowed: {rel}")
+    raise SystemExit("production directory contains local/generated files")
+
+du = subprocess.run(["du", "-sk", "."], check=True, capture_output=True, text=True)
+tree_mib = int(du.stdout.split()[0]) / 1024
+print(f"  remote tree: {tree_mib:.1f}MiB")
+if tree_mib > max_tree_mib:
+    raise SystemExit(f"remote tree {tree_mib:.1f}MiB exceeds budget {max_tree_mib:.1f}MiB")
+print("  required files present; no local/generated artifacts found")
+PY
 
 echo "[REMOTE] docker compose config"
 $COMPOSE config >/tmp/rtime-status-board.prod.compose.yml
@@ -306,6 +362,7 @@ remote_cmd+=" MAX_STATUSD_MEM_MIB=$(printf "%q" "$MAX_STATUSD_MEM_MIB")"
 remote_cmd+=" MAX_GATUS_MEM_MIB=$(printf "%q" "$MAX_GATUS_MEM_MIB")"
 remote_cmd+=" MAX_COMBINED_MEM_MIB=$(printf "%q" "$MAX_COMBINED_MEM_MIB")"
 remote_cmd+=" MAX_COMBINED_CPU_PERCENT=$(printf "%q" "$MAX_COMBINED_CPU_PERCENT")"
+remote_cmd+=" MAX_REMOTE_TREE_MIB=$(printf "%q" "$MAX_REMOTE_TREE_MIB")"
 remote_cmd+=" bash -lc $(printf "%q" "$remote_script")"
 
 "$RTIME_SSH" "$REMOTE_NODE" "$remote_cmd"
