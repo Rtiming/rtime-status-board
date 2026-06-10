@@ -156,9 +156,10 @@ as `GET /api/v1/nodes/:id/metrics`. It deliberately stores normalized route
 patterns rather than query strings or raw request bodies. Recent bounded samples
 with API 5xx responses or latency above the slow-request threshold are promoted
 into `/api/v1/diagnostics.ops` as `runtime-api` issues. This keeps interface
-failures visible in the action list without adding a log store. It is intended
-for deployment and growth debugging, especially keeping sh-core resource use
-small.
+failures visible in the action list without adding a log store. Each promoted
+issue includes a short normalized route summary for the recent failing or slow
+samples. It is intended for deployment and growth debugging, especially keeping
+sh-core resource use small.
 
 `/api/v1/diagnostics.deployment` exposes low-load deployment-boundary checks for
 the board process. In production it verifies the expected localhost backend

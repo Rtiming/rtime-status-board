@@ -245,7 +245,9 @@ route totals. This is for debugging and tuning only; it is not a long-retention
 access log and does not write request data to SQLite.
 Recent API 5xx responses and slow samples are also promoted into
 `/api/v1/diagnostics.ops` as `runtime-api` issues, so interface failures appear
-in the same action list as service, collector, and resource problems.
+in the same action list as service, collector, and resource problems. Those
+issues include a short normalized route summary for the recent failing or slow
+samples.
 
 Future detail and chart APIs are documented in `docs/architecture/api-contract.md`.
 `/api/v1/nodes/:id` returns a lightweight node detail view assembled from

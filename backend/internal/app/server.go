@@ -187,6 +187,7 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 	}
 
 	if recentServerErrors > 0 {
+		routeSummary := summarizeAPIRequestIssueRoutes(requests.Recent, func(sample APIRequestSample) bool { return sample.Status >= 500 })
 		ops.Issues = append(ops.Issues, OpsIssue{
 			Severity:   "error",
 			Kind:       "runtime-api",
@@ -195,11 +196,14 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 			Metric:     "http_5xx",
 			Value:      float64(recentServerErrors),
 			Unit:       "requests",
-			Detail:     fmt.Sprintf("%d recent API samples returned 5xx", recentServerErrors),
+			Detail:     fmt.Sprintf("%d recent API samples returned 5xx; routes: %s", recentServerErrors, routeSummary),
 			ObservedAt: latest,
 		})
 	}
 	if recentSlow > 0 {
+		routeSummary := summarizeAPIRequestIssueRoutes(requests.Recent, func(sample APIRequestSample) bool {
+			return requests.SlowThresholdMS > 0 && sample.DurationMS >= requests.SlowThresholdMS
+		})
 		ops.Issues = append(ops.Issues, OpsIssue{
 			Severity:   "warn",
 			Kind:       "runtime-api",
@@ -209,7 +213,7 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 			Value:      requests.RecentP95DurationMS,
 			Limit:      requests.SlowThresholdMS,
 			Unit:       "ms",
-			Detail:     fmt.Sprintf("%d recent API samples exceeded the slow request threshold", recentSlow),
+			Detail:     fmt.Sprintf("%d recent API samples exceeded the slow request threshold; routes: %s", recentSlow, routeSummary),
 			ObservedAt: latest,
 		})
 	}
@@ -225,6 +229,45 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 	})
 	ops.Counts = countOpsIssues(ops.Issues)
 	return ops
+}
+
+func summarizeAPIRequestIssueRoutes(samples []APIRequestSample, include func(APIRequestSample) bool) string {
+	type routeCount struct {
+		key   string
+		count int
+	}
+	counts := map[string]int{}
+	for _, sample := range samples {
+		if !include(sample) {
+			continue
+		}
+		key := strings.TrimSpace(sample.Method + " " + sample.Route)
+		if key == "" {
+			key = defaultAPIRequestUnknownPattern
+		}
+		counts[key]++
+	}
+	if len(counts) == 0 {
+		return "-"
+	}
+	items := make([]routeCount, 0, len(counts))
+	for key, count := range counts {
+		items = append(items, routeCount{key: key, count: count})
+	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].count == items[j].count {
+			return items[i].key < items[j].key
+		}
+		return items[i].count > items[j].count
+	})
+	if len(items) > 3 {
+		items = items[:3]
+	}
+	parts := make([]string, 0, len(items))
+	for _, item := range items {
+		parts = append(parts, fmt.Sprintf("%s x%d", item.key, item.count))
+	}
+	return strings.Join(parts, ", ")
 }
 
 func (s *Server) metricsReport(w http.ResponseWriter, r *http.Request) {

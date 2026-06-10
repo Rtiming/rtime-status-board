@@ -1370,8 +1370,14 @@ func TestAPIRequestIssuesAreAddedToOpsDigest(t *testing.T) {
 	if ids["api-5xx"].Severity != "error" || ids["api-5xx"].Value != 1 {
 		t.Fatalf("api-5xx issue = %#v, want one error", ids["api-5xx"])
 	}
+	if !strings.Contains(ids["api-5xx"].Detail, "GET /api/v1/diagnostics x1") {
+		t.Fatalf("api-5xx detail = %q, want route summary", ids["api-5xx"].Detail)
+	}
 	if ids["api-slow"].Severity != "warn" || ids["api-slow"].Value != 750 || ids["api-slow"].Limit != 500 {
 		t.Fatalf("api-slow issue = %#v, want latency warning with p95 and limit", ids["api-slow"])
+	}
+	if !strings.Contains(ids["api-slow"].Detail, "GET /api/v1/summary x1") {
+		t.Fatalf("api-slow detail = %q, want route summary", ids["api-slow"].Detail)
 	}
 }
 
@@ -1388,6 +1394,20 @@ func TestAPIRequestIssuesIgnoreHealthyRecentSamples(t *testing.T) {
 	ops := opsWithAPIRequestIssues(OpsDiagnostic{}, requests, now)
 	if len(ops.Issues) != 0 || ops.Counts != (OpsIssueCounts{}) {
 		t.Fatalf("ops = %#v, want no API request issues", ops)
+	}
+}
+
+func TestSummarizeAPIRequestIssueRoutesRanksAndBoundsRoutes(t *testing.T) {
+	samples := []APIRequestSample{
+		{Method: http.MethodGet, Route: "/api/v1/summary", Status: http.StatusInternalServerError},
+		{Method: http.MethodGet, Route: "/api/v1/summary", Status: http.StatusBadGateway},
+		{Method: http.MethodGet, Route: "/api/v1/diagnostics", Status: http.StatusInternalServerError},
+		{Method: http.MethodGet, Route: "/api/v1/nodes/:id", Status: http.StatusBadGateway},
+		{Method: http.MethodGet, Route: "/api/v1/projects/:id", Status: http.StatusBadGateway},
+	}
+	summary := summarizeAPIRequestIssueRoutes(samples, func(sample APIRequestSample) bool { return sample.Status >= 500 })
+	if summary != "GET /api/v1/summary x2, GET /api/v1/diagnostics x1, GET /api/v1/nodes/:id x1" {
+		t.Fatalf("summary = %q, want top three ranked routes", summary)
 	}
 }
 
