@@ -448,7 +448,8 @@ Useful optional agent knobs:
 Service-level resource budgets are configured in `config/status-board.yaml`
 under a service's `resource_budget`. They match existing Docker container
 snapshots by `container_names` and/or `compose_project`, then report current
-memory/CPU against budget in Diagnostics. Example:
+memory/CPU, usage percent, and remaining headroom against budget in
+Diagnostics. Example:
 
 ```yaml
 resource_budget:

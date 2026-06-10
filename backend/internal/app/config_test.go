@@ -431,6 +431,9 @@ func TestMetricsDiagnosticServiceResourceBudgets(t *testing.T) {
 	if budget.Status != StatusOK || budget.MemoryUsageBytes != 978<<20 || len(budget.MatchedContainers) != 2 {
 		t.Fatalf("budget = %#v, want ok 978MiB from two Khoj containers", budget)
 	}
+	if budget.MemoryHeadroomBytes != 558<<20 || budget.MemoryUsagePercent < 63.6 || budget.MemoryUsagePercent > 63.7 || budget.CPUHeadroomPercent < 49.3 || budget.CPUHeadroomPercent > 49.5 {
+		t.Fatalf("budget headroom = %#v, want memory percent/headroom and CPU headroom", budget)
+	}
 	if len(diag.ServiceResourceIssues) != 0 {
 		t.Fatalf("resource issues = %#v, want none", diag.ServiceResourceIssues)
 	}
@@ -515,6 +518,10 @@ func TestMetricsDiagnosticServiceResourceBudgetIssues(t *testing.T) {
 	})
 	if len(diag.ServiceResourceBudgets) != 1 || diag.ServiceResourceBudgets[0].Status != StatusDegraded {
 		t.Fatalf("budget status = %#v, want degraded", diag.ServiceResourceBudgets)
+	}
+	budget := diag.ServiceResourceBudgets[0]
+	if budget.MemoryUsagePercent != 200 || budget.MemoryHeadroomBytes != -(100<<20) || budget.CPUHeadroomPercent != -5 {
+		t.Fatalf("budget headroom = %#v, want negative memory and CPU headroom", budget)
 	}
 	if len(diag.ServiceResourceIssues) != 3 {
 		t.Fatalf("resource issues = %#v, want missing container, memory, and cpu issues", diag.ServiceResourceIssues)

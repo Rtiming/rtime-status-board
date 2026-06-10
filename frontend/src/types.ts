@@ -302,8 +302,11 @@ export interface ServiceResourceBudgetStatus {
   missing_containers?: string[];
   memory_usage_bytes: number;
   max_memory_bytes?: number;
+  memory_usage_percent: number;
+  memory_headroom_bytes: number;
   cpu_percent: number;
   max_cpu_percent?: number;
+  cpu_headroom_percent: number;
   detail: string;
 }
 

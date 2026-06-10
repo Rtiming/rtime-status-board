@@ -143,8 +143,9 @@ service-level budgets from static config against the latest container snapshot.
 It is a read-only aggregation over already-stored metrics. It does not add a
 new collector or polling loop. Each row includes service/node IDs, matched and
 missing container names, current memory/CPU totals, configured limits, status,
-and detail text. `service_resource_issues` contains only the rows that need
-attention, such as a missing configured container or memory/CPU over budget.
+derived memory usage percent, memory/CPU headroom, and detail text.
+`service_resource_issues` contains only the rows that need attention, such as a
+missing configured container or memory/CPU over budget.
 The production config includes the status board's own `statusd` and `gatus`
 containers as the `sh-core-status-board-api` service budget, keeping self-load
 visible inside the same Diagnostics/Ops contract as project services.

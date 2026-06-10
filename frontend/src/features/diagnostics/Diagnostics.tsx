@@ -1,9 +1,9 @@
 import { Activity, Clock, Gauge, ListChecks, RefreshCw, Server, ShieldCheck, TriangleAlert } from 'lucide-react';
 import { AgentReportRow, Metric, Panel, Row } from '../../shared/components';
-import { formatBytes, formatCount, formatDuration, formatEventKindCounts, formatHeadroomCell, formatLatencyMS, formatList, formatOpsIssue, formatSeconds, formatStatusCountSummary, formatThresholdRate, formatTime } from '../../shared/format';
+import { formatBytes, formatCount, formatDuration, formatEventKindCounts, formatHeadroomCell, formatLatencyMS, formatList, formatOpsIssue, formatSeconds, formatSignedOpsValue, formatStatusCountSummary, formatThresholdRate, formatTime } from '../../shared/format';
 import { dictionary, type Lang } from '../../shared/i18n';
 import { StatusPill, statusLabel } from '../../shared/status';
-import type { AgentNodeDiagnostic, DiagnosticsResponse, RuntimeEndpointStatus } from '../../types';
+import type { AgentNodeDiagnostic, DiagnosticsResponse, RuntimeEndpointStatus, ServiceResourceBudgetStatus } from '../../types';
 
 export function Diagnostics({
   diagnostics,
@@ -674,11 +674,9 @@ export function Diagnostics({
                 <span>{budget.node_id}</span>
                 <span>{budget.service_name}</span>
                 <em>
-                  {formatBytes(budget.memory_usage_bytes)}
-                  {budget.max_memory_bytes ? ` / ${formatBytes(budget.max_memory_bytes)}` : ''}
+                  {formatServiceBudgetMemory(budget, t.remaining)}
                   {' · '}
-                  {t.cpu} {budget.cpu_percent.toFixed(1)}%
-                  {budget.max_cpu_percent ? ` / ${budget.max_cpu_percent.toFixed(1)}%` : ''}
+                  {formatServiceBudgetCPU(budget, t.cpu, t.remaining)}
                   {' · '}
                   {(budget.matched_containers ?? []).join(', ') || budget.detail}
                 </em>
@@ -794,6 +792,21 @@ function CheckRow({ check, lang }: { check: RuntimeEndpointStatus; lang: Lang })
       </td>
     </tr>
   );
+}
+
+function formatServiceBudgetMemory(budget: ServiceResourceBudgetStatus, remainingLabel: string) {
+  const usage = formatBytes(budget.memory_usage_bytes);
+  if (!budget.max_memory_bytes) return usage;
+  const percent = Number.isFinite(budget.memory_usage_percent) ? ` (${budget.memory_usage_percent.toFixed(1)}%)` : '';
+  const remaining = formatSignedOpsValue(budget.memory_headroom_bytes ?? 0, 'bytes');
+  return `${usage}${percent} / ${formatBytes(budget.max_memory_bytes)} · ${remainingLabel} ${remaining}`;
+}
+
+function formatServiceBudgetCPU(budget: ServiceResourceBudgetStatus, cpuLabel: string, remainingLabel: string) {
+  const usage = `${cpuLabel} ${budget.cpu_percent.toFixed(1)}%`;
+  if (!budget.max_cpu_percent) return usage;
+  const remaining = formatSignedOpsValue(budget.cpu_headroom_percent ?? 0, '%');
+  return `${usage} / ${budget.max_cpu_percent.toFixed(1)}% · ${remainingLabel} ${remaining}`;
 }
 
 function AgentHealthRow({ row, lang }: { row: AgentNodeDiagnostic; lang: Lang }) {

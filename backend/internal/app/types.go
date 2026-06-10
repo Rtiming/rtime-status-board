@@ -347,18 +347,21 @@ type MetricsCollectorSummary struct {
 }
 
 type ServiceResourceBudgetStatus struct {
-	ServiceID         string   `json:"service_id"`
-	ServiceName       string   `json:"service_name"`
-	NodeID            string   `json:"node_id"`
-	Status            Status   `json:"status"`
-	ContainerNames    []string `json:"container_names"`
-	MatchedContainers []string `json:"matched_containers"`
-	MissingContainers []string `json:"missing_containers,omitempty"`
-	MemoryUsageBytes  int64    `json:"memory_usage_bytes"`
-	MaxMemoryBytes    int64    `json:"max_memory_bytes,omitempty"`
-	CPUPercent        float64  `json:"cpu_percent"`
-	MaxCPUPercent     float64  `json:"max_cpu_percent,omitempty"`
-	Detail            string   `json:"detail"`
+	ServiceID           string   `json:"service_id"`
+	ServiceName         string   `json:"service_name"`
+	NodeID              string   `json:"node_id"`
+	Status              Status   `json:"status"`
+	ContainerNames      []string `json:"container_names"`
+	MatchedContainers   []string `json:"matched_containers"`
+	MissingContainers   []string `json:"missing_containers,omitempty"`
+	MemoryUsageBytes    int64    `json:"memory_usage_bytes"`
+	MaxMemoryBytes      int64    `json:"max_memory_bytes,omitempty"`
+	MemoryUsagePercent  float64  `json:"memory_usage_percent"`
+	MemoryHeadroomBytes int64    `json:"memory_headroom_bytes"`
+	CPUPercent          float64  `json:"cpu_percent"`
+	MaxCPUPercent       float64  `json:"max_cpu_percent,omitempty"`
+	CPUHeadroomPercent  float64  `json:"cpu_headroom_percent"`
+	Detail              string   `json:"detail"`
 }
 
 type ServiceResourceIssue struct {

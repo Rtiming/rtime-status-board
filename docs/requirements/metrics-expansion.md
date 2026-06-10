@@ -118,7 +118,9 @@ Current implementation status:
   such as Khoj visible without adding a new collector or long-retention metrics
   store. The production config also budgets the status board's own `statusd`
   and `gatus` containers under `sh-core-status-board-api`, so self-load is
-  visible from the board rather than only from the deployment verifier.
+  visible from the board rather than only from the deployment verifier. Budget
+  rows expose derived memory usage percent plus memory/CPU headroom, so drill
+  down views can show remaining capacity without another collector.
 - Diagnostics now includes status-board runtime and SQLite store statistics
   so deployment resource growth can be checked without opening shell logs or
   adding another process.

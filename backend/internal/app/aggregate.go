@@ -2460,6 +2460,13 @@ func (a *Aggregator) serviceResourceBudgetStatuses(metrics []MetricsView) ([]Ser
 				issues = append(issues, serviceResourceIssue(service, "warn", "container", 0, 0, "", name, "configured container was not found in latest metrics"))
 			}
 		}
+		if status.MaxMemoryBytes > 0 {
+			status.MemoryUsagePercent = float64(status.MemoryUsageBytes) / float64(status.MaxMemoryBytes) * 100
+			status.MemoryHeadroomBytes = status.MaxMemoryBytes - status.MemoryUsageBytes
+		}
+		if status.MaxCPUPercent > 0 {
+			status.CPUHeadroomPercent = status.MaxCPUPercent - status.CPUPercent
+		}
 		if status.MaxMemoryBytes > 0 && status.MemoryUsageBytes > status.MaxMemoryBytes {
 			status.Status = StatusDegraded
 			status.Detail = fmt.Sprintf("memory %.1fMiB exceeds %.1fMiB", bytesToMiB(status.MemoryUsageBytes), bytesToMiB(status.MaxMemoryBytes))

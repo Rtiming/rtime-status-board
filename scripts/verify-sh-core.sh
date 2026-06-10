@@ -470,9 +470,16 @@ for service_id in ("orangepi-khoj", "sh-core-status-board-api"):
         raise SystemExit(f"service resource budget {service_id} is not ok: {row}")
     if not row.get("matched_containers"):
         raise SystemExit(f"service resource budget {service_id} matched no containers: {row}")
+    if row.get("max_memory_bytes", 0) > 0:
+        if row.get("memory_usage_percent", -1) < 0 or row.get("memory_headroom_bytes") is None:
+            raise SystemExit(f"service resource budget {service_id} missing memory headroom: {row}")
+    if row.get("max_cpu_percent", 0) > 0 and row.get("cpu_headroom_percent") is None:
+        raise SystemExit(f"service resource budget {service_id} missing CPU headroom: {row}")
 status_board_budget = budget_by_service.get("sh-core-status-board-api") or {}
 if sorted(status_board_budget.get("matched_containers") or []) != ["rtime-status-board-gatus", "rtime-status-board-statusd"]:
     raise SystemExit(f"status-board budget matched unexpected containers: {status_board_budget}")
+if status_board_budget.get("memory_headroom_bytes", 0) <= 0 or status_board_budget.get("cpu_headroom_percent", 0) <= 0:
+    raise SystemExit(f"status-board budget has no positive headroom: {status_board_budget}")
 
 if len(metrics) != EXPECTED_NODE_COUNT:
     raise SystemExit(f"metrics node count = {len(metrics)}, want {EXPECTED_NODE_COUNT}")
