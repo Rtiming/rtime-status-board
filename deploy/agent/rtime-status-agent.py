@@ -5,6 +5,7 @@ import re
 import shutil
 import socket
 import subprocess
+import sys
 import time
 import urllib.request
 
@@ -475,27 +476,7 @@ def post_json(url, token, payload):
         return body
 
 
-def timed_collector(name, collector, fallback):
-    start = time.time()
-    try:
-        value = collector()
-        return value, {"name": name, "ok": True, "elapsed_ms": int((time.time() - start) * 1000)}
-    except Exception as exc:
-        return fallback, {"name": name, "ok": False, "detail": str(exc), "elapsed_ms": int((time.time() - start) * 1000)}
-
-
-def report_url():
-    url = os.environ.get("STATUS_BOARD_URL", "http://100.64.10.5:18083/api/v1/metrics/report/v2")
-    report_version = os.environ.get("STATUS_BOARD_REPORT_VERSION", "2")
-    if report_version == "2" and url.endswith("/api/v1/metrics/report"):
-        return url + "/v2"
-    return url
-
-
-def main():
-    node_id = os.environ["STATUS_BOARD_NODE_ID"]
-    token = os.environ.get("STATUS_BOARD_AGENT_TOKEN", "")
-
+def build_payload(node_id):
     info = meminfo()
     cpu, cpu_status = timed_collector("cpu", cpu_metrics, {"percent": 0, "load1": 0, "load5": 0, "load15": 0})
     storage, storage_status = timed_collector("storage", storage_metrics, {"read_bytes": 0, "write_bytes": 0, "devices": []})
@@ -524,7 +505,7 @@ def main():
         "STATUS_BOARD_COLLECT_PROCESSES",
     )
 
-    payload = {
+    return {
         "schema_version": 2,
         "node_id": node_id,
         "hostname": socket.gethostname(),
@@ -544,6 +525,76 @@ def main():
         "collector_status": [cpu_status, storage_status, network_status, gpu_status, containers_status, processes_status],
         "extra": {"agent": "rtime-status-agent.py", "report_version": "2"},
     }
+
+
+def agent_check_summary(payload):
+    statuses = payload.get("collector_status", [])
+    failed = [item for item in statuses if not item.get("ok")]
+    required = {"cpu", "storage", "network"}
+    required_failed = [item for item in failed if item.get("name") in required]
+    resources = payload.get("resources", {})
+    storage = resources.get("storage", {})
+    network = resources.get("network", {})
+    gpu = resources.get("gpu", {})
+    containers = resources.get("containers", {})
+    processes = resources.get("processes", {})
+    return {
+        "ok": len(required_failed) == 0,
+        "schema_version": payload.get("schema_version"),
+        "node_id": payload.get("node_id"),
+        "hostname": payload.get("hostname"),
+        "collector_ok": len(statuses) - len(failed),
+        "collector_failed": len(failed),
+        "required_failed": [item.get("name", "") for item in required_failed],
+        "optional_failed": [item.get("name", "") for item in failed if item.get("name") not in required],
+        "gpu_available": bool(gpu.get("available")),
+        "gpu_provider": gpu.get("provider", ""),
+        "container_available": bool(containers.get("available")),
+        "container_count": len(containers.get("containers", [])),
+        "process_count": int(processes.get("process_count", 0) or 0),
+        "storage_device_count": len(storage.get("devices", [])),
+        "network_interface_count": len(network.get("interfaces", [])),
+        "collector_status": statuses,
+    }
+
+
+def timed_collector(name, collector, fallback):
+    start = time.time()
+    try:
+        value = collector()
+        return value, {"name": name, "ok": True, "elapsed_ms": int((time.time() - start) * 1000)}
+    except Exception as exc:
+        return fallback, {"name": name, "ok": False, "detail": str(exc), "elapsed_ms": int((time.time() - start) * 1000)}
+
+
+def report_url():
+    url = os.environ.get("STATUS_BOARD_URL", "http://100.64.10.5:18083/api/v1/metrics/report/v2")
+    report_version = os.environ.get("STATUS_BOARD_REPORT_VERSION", "2")
+    if report_version == "2" and url.endswith("/api/v1/metrics/report"):
+        return url + "/v2"
+    return url
+
+
+def main():
+    check_mode = "--check" in sys.argv
+    print_mode = "--print" in sys.argv
+    if check_mode or print_mode:
+        node_id = os.environ.get("STATUS_BOARD_NODE_ID", socket.gethostname())
+    else:
+        node_id = os.environ["STATUS_BOARD_NODE_ID"]
+    token = os.environ.get("STATUS_BOARD_AGENT_TOKEN", "")
+
+    payload = build_payload(node_id)
+    if print_mode:
+        print(json.dumps(payload, indent=2, sort_keys=True))
+        return
+    if check_mode:
+        summary = agent_check_summary(payload)
+        print(json.dumps(summary, indent=2, sort_keys=True))
+        if not summary["ok"]:
+            raise SystemExit(1)
+        return
+
     post_json(report_url(), token, payload)
 
 

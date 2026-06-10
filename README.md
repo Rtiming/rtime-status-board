@@ -226,6 +226,42 @@ Expect `401 Unauthorized` until credentials are supplied. If external DNS is
 not configured yet, use the public IP path or Tailnet entry instead of the
 domain.
 
+## Metrics Agents
+
+Install or refresh the lightweight metrics agent on the configured nodes:
+
+```bash
+./scripts/install-metrics-agents.sh
+```
+
+The installer pushes `deploy/agent/rtime-status-agent.py`, runs a one-shot
+`--check` self-test on each target before installing the timer, then writes the
+systemd or user-cron environment. The self-test collects the v2 payload once,
+prints a redacted collector summary, and exits non-zero only when required base
+collectors such as CPU, storage, or network fail. Optional GPU, container, and
+process collectors are reported in the summary without requiring a GPU or
+Docker socket to exist on every node.
+
+The default agent remains low-load: base collectors run once per minute, while
+GPU is locally cached for 120s and container/process snapshots for 300s. Tune
+or disable the heavier collectors at install time without committing secrets:
+
+```bash
+STATUS_BOARD_COLLECT_CONTAINERS=0 \
+STATUS_BOARD_COLLECT_PROCESSES=1 \
+STATUS_BOARD_GPU_INTERVAL_SECONDS=120 \
+STATUS_BOARD_CONTAINER_INTERVAL_SECONDS=300 \
+STATUS_BOARD_PROCESS_INTERVAL_SECONDS=300 \
+./scripts/install-metrics-agents.sh
+```
+
+For manual diagnosis on a Linux node:
+
+```bash
+STATUS_BOARD_NODE_ID=sh-core python3 /opt/rtime-status-agent/rtime-status-agent.py --check
+STATUS_BOARD_NODE_ID=sh-core python3 /opt/rtime-status-agent/rtime-status-agent.py --print
+```
+
 ## API
 
 - `GET /api/v1/health`

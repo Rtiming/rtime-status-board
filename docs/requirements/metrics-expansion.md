@@ -75,6 +75,14 @@ retuned with `STATUS_BOARD_COLLECT_CONTAINERS`,
 `STATUS_BOARD_COLLECT_PROCESSES`, `STATUS_BOARD_PROCESS_LIMIT`, and
 `STATUS_BOARD_PROCESS_INTERVAL_SECONDS`.
 
+The metrics agent also has an offline `--check` mode for installation and
+troubleshooting. It builds the same v2 payload once, prints a redacted summary
+with collector OK/failure counts, GPU/container/process availability, storage
+device count, and network interface count, then exits non-zero only when
+required base collectors such as CPU, storage, or network fail. Optional GPU,
+container, and process collector failures remain visible in the summary without
+blocking nodes that do not have those capabilities.
+
 ### Project Runtime
 
 Projects should be able to aggregate:
@@ -109,6 +117,10 @@ Current implementation status:
 - Diagnostics now exposes GPU-reporting nodes and metrics collector issues, so
   failed CPU/IO/GPU/container/process reads are visible from the board before
   opening remote logs.
+- The agent installer now runs `rtime-status-agent.py --check` on each target
+  before installing or restarting the timer. This catches missing Python,
+  broken `/proc` reads, and required collector failures before the board has to
+  infer the problem from stale reports.
 - Diagnostics now also exposes a per-collector coverage matrix from latest
   agent reports. It shows observed, OK, failed, cached, and missing nodes plus
   elapsed/cache-age summaries for each reported collector, so old agents or
@@ -272,6 +284,8 @@ Keep the default agent cheap:
 - GPU every 2m by default, using local cache between agent runs;
 - container/process every 5m by default, using local cache between agent runs
   and capping rows to 8 by default;
+- install-time `--check` is a one-shot foreground diagnostic and does not add a
+  background service, writer, or polling loop;
 - history retention defaults to 30d in the current build, with the option to
   lower it through `STATUS_BOARD_METRICS_RETENTION` if sh-core load or disk
   growth warrants it; downsampling can come later.

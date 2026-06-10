@@ -103,7 +103,10 @@ deploy/agent/
 ```
 
 The deployed artifact can still be one file for simplicity, but collector
-functions should follow the same grouping.
+functions should follow the same grouping. Keep `--check` as the official
+offline smoke-test entry for this file: it must build the same v2 payload shape
+as normal reporting, print only redacted collector/resource counts, and avoid
+posting to the board or requiring secrets.
 
 ## Settings Boundary
 
