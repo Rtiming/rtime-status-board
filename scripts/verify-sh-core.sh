@@ -341,6 +341,9 @@ if (request_diag.get("status_counts") or {}).get("success", 0) < 1:
 route_keys = {f"{route.get('method')} {route.get('route')}" for route in request_diag.get("routes") or []}
 if "GET /api/v1/health" not in route_keys:
     raise SystemExit(f"runtime request diagnostics missing health route: {request_diag.get('routes')}")
+runtime_api_issues = [issue for issue in ((diagnostics.get("ops") or {}).get("issues") or []) if issue.get("kind") == "runtime-api"]
+if runtime_api_issues:
+    raise SystemExit(f"runtime API request issues in healthy verification path: {runtime_api_issues}")
 
 if schema.get("version") != 2:
     raise SystemExit(f"telemetry schema version = {schema.get('version')}, want 2")

@@ -153,8 +153,12 @@ bounded in-memory API request diagnostics. `runtime.requests` includes total
 requests since process start, status-class counts, slow-request count,
 recent-sample P95/max latency, latest samples, and normalized route totals such
 as `GET /api/v1/nodes/:id/metrics`. It deliberately stores normalized route
-patterns rather than query strings or raw request bodies. It is intended for
-deployment and growth debugging, especially keeping sh-core resource use small.
+patterns rather than query strings or raw request bodies. Recent bounded samples
+with API 5xx responses or latency above the slow-request threshold are promoted
+into `/api/v1/diagnostics.ops` as `runtime-api` issues. This keeps interface
+failures visible in the action list without adding a log store. It is intended
+for deployment and growth debugging, especially keeping sh-core resource use
+small.
 
 `/api/v1/diagnostics.deployment` exposes low-load deployment-boundary checks for
 the board process. In production it verifies the expected localhost backend
@@ -197,8 +201,9 @@ loop.
 
 `/api/v1/diagnostics.ops` is a low-load issue digest assembled from the same
 latest-state sources: non-OK services, missing/stale agents, collector issues,
-service resource budget issues, config warnings/errors, and latest node/GPU
-threshold checks. It returns `issues`, `counts.error/warn/info`, and
+service resource budget issues, config warnings/errors, recent API request
+health issues, and latest node/GPU threshold checks. It returns `issues`,
+`counts.error/warn/info`, and
 `resource_thresholds` with the effective per-node CPU, memory, root disk, GPU
 utilization, network RX/TX rate, and storage read/write rate limits used for
 those checks. The thresholds come from `config/status-board.yaml` under

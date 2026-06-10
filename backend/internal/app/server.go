@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -155,8 +157,74 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 		s.writeError(w, http.StatusInternalServerError, err)
 		return
 	}
-	diagnostics.Runtime.Requests = s.requestStats.Snapshot()
+	requests := s.requestStats.Snapshot()
+	diagnostics.Runtime.Requests = requests
+	diagnostics.Ops = opsWithAPIRequestIssues(diagnostics.Ops, requests, time.Now().UTC())
 	s.writeJSON(w, http.StatusOK, diagnostics)
+}
+
+func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, now time.Time) OpsDiagnostic {
+	if requests.Total == 0 || len(requests.Recent) == 0 {
+		return ops
+	}
+
+	var recentServerErrors int
+	var recentSlow int
+	var latest time.Time
+	for _, sample := range requests.Recent {
+		if sample.Status >= 500 {
+			recentServerErrors++
+		}
+		if requests.SlowThresholdMS > 0 && sample.DurationMS >= requests.SlowThresholdMS {
+			recentSlow++
+		}
+		if sample.At.After(latest) {
+			latest = sample.At
+		}
+	}
+	if latest.IsZero() {
+		latest = now
+	}
+
+	if recentServerErrors > 0 {
+		ops.Issues = append(ops.Issues, OpsIssue{
+			Severity:   "error",
+			Kind:       "runtime-api",
+			SubjectID:  "api-5xx",
+			Status:     StatusDown,
+			Metric:     "http_5xx",
+			Value:      float64(recentServerErrors),
+			Unit:       "requests",
+			Detail:     fmt.Sprintf("%d recent API samples returned 5xx", recentServerErrors),
+			ObservedAt: latest,
+		})
+	}
+	if recentSlow > 0 {
+		ops.Issues = append(ops.Issues, OpsIssue{
+			Severity:   "warn",
+			Kind:       "runtime-api",
+			SubjectID:  "api-slow",
+			Status:     StatusDegraded,
+			Metric:     "latency",
+			Value:      requests.RecentP95DurationMS,
+			Limit:      requests.SlowThresholdMS,
+			Unit:       "ms",
+			Detail:     fmt.Sprintf("%d recent API samples exceeded the slow request threshold", recentSlow),
+			ObservedAt: latest,
+		})
+	}
+
+	sort.Slice(ops.Issues, func(i, j int) bool {
+		if severityRank(ops.Issues[i].Severity) == severityRank(ops.Issues[j].Severity) {
+			if ops.Issues[i].Kind == ops.Issues[j].Kind {
+				return ops.Issues[i].SubjectID < ops.Issues[j].SubjectID
+			}
+			return ops.Issues[i].Kind < ops.Issues[j].Kind
+		}
+		return severityRank(ops.Issues[i].Severity) < severityRank(ops.Issues[j].Severity)
+	})
+	ops.Counts = countOpsIssues(ops.Issues)
+	return ops
 }
 
 func (s *Server) metricsReport(w http.ResponseWriter, r *http.Request) {

@@ -129,6 +129,10 @@ Current implementation status:
   status-class counts, slow-request count, recent P95/max latency, latest
   samples, and normalized route totals. It gives interface debugging signals
   without adding a log store, SQLite writes, or high-cardinality raw paths.
+- The ops digest now promotes recent API 5xx responses and slow API samples
+  into `runtime-api` issues, so backend interface failures are visible beside
+  service, collector, config, and resource problems without opening container
+  logs first.
 - Diagnostics now includes deployment-boundary checks for the board runtime
   itself: production mode, reserved localhost ports, Gatus URL, config/data/
   frontend paths, frontend artifact readability, cache TTL, retention, SQLite

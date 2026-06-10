@@ -1347,6 +1347,50 @@ func TestRequestStatsNormalizesRoutesAndBoundsRecentSamples(t *testing.T) {
 	}
 }
 
+func TestAPIRequestIssuesAreAddedToOpsDigest(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	requests := APIRequestDiagnostic{
+		Total:               3,
+		SlowThresholdMS:     500,
+		RecentP95DurationMS: 750,
+		Recent: []APIRequestSample{
+			{Method: http.MethodGet, Route: "/api/v1/summary", Status: http.StatusOK, DurationMS: 750, At: now},
+			{Method: http.MethodGet, Route: "/api/v1/diagnostics", Status: http.StatusBadGateway, DurationMS: 20, At: now.Add(time.Second)},
+		},
+	}
+
+	ops := opsWithAPIRequestIssues(OpsDiagnostic{}, requests, now)
+	if ops.Counts.Error != 1 || ops.Counts.Warn != 1 {
+		t.Fatalf("ops counts = %#v, want one error and one warn", ops.Counts)
+	}
+	ids := map[string]OpsIssue{}
+	for _, issue := range ops.Issues {
+		ids[issue.SubjectID] = issue
+	}
+	if ids["api-5xx"].Severity != "error" || ids["api-5xx"].Value != 1 {
+		t.Fatalf("api-5xx issue = %#v, want one error", ids["api-5xx"])
+	}
+	if ids["api-slow"].Severity != "warn" || ids["api-slow"].Value != 750 || ids["api-slow"].Limit != 500 {
+		t.Fatalf("api-slow issue = %#v, want latency warning with p95 and limit", ids["api-slow"])
+	}
+}
+
+func TestAPIRequestIssuesIgnoreHealthyRecentSamples(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	requests := APIRequestDiagnostic{
+		Total:           1,
+		SlowThresholdMS: 500,
+		Recent: []APIRequestSample{
+			{Method: http.MethodGet, Route: "/api/v1/summary", Status: http.StatusOK, DurationMS: 20, At: now},
+		},
+	}
+
+	ops := opsWithAPIRequestIssues(OpsDiagnostic{}, requests, now)
+	if len(ops.Issues) != 0 || ops.Counts != (OpsIssueCounts{}) {
+		t.Fatalf("ops = %#v, want no API request issues", ops)
+	}
+}
+
 func TestStoreDiagnosticsReportsCountsAndRetention(t *testing.T) {
 	store, err := OpenStore(filepath.Join(t.TempDir(), "status-board.db"))
 	if err != nil {
