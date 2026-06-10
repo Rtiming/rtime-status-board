@@ -294,7 +294,9 @@ def get(path):
 diagnostics = get("/api/v1/diagnostics")
 metrics = get("/api/v1/metrics")
 schema = get("/api/v1/telemetry/schema")
+nodes = get("/api/v1/nodes")
 projects = get("/api/v1/projects")
+services = get("/api/v1/services")
 
 if schema.get("version") != 2:
     raise SystemExit(f"telemetry schema version = {schema.get('version')}, want 2")
@@ -338,7 +340,51 @@ if failures:
 else:
     print("  service failures: none")
 
-print("[REMOTE] project check log smoke")
+print("[REMOTE] detail API smoke")
+for node in nodes:
+    node_id = node.get("id")
+    if not node_id:
+        continue
+    detail = get("/api/v1/nodes/" + urllib.parse.quote(node_id, safe=""))
+    if detail.get("node", {}).get("id") != node_id:
+        raise SystemExit(f"node detail mismatch for {node_id}")
+    if "resource_states" not in detail:
+        raise SystemExit(f"node detail missing resource_states for {node_id}")
+print(f"  node details: {len(nodes)}")
+
+for project in projects:
+    project_id = project.get("id")
+    if not project_id:
+        continue
+    detail = get("/api/v1/projects/" + urllib.parse.quote(project_id, safe=""))
+    if detail.get("project", {}).get("id") != project_id:
+        raise SystemExit(f"project detail mismatch for {project_id}")
+    if "resource_states" not in detail:
+        raise SystemExit(f"project detail missing resource_states for {project_id}")
+print(f"  project details: {len(projects)}")
+
+for service in services:
+    service_id = service.get("id")
+    if not service_id:
+        continue
+    detail = get("/api/v1/services/" + urllib.parse.quote(service_id, safe=""))
+    if detail.get("service", {}).get("id") != service_id:
+        raise SystemExit(f"service detail mismatch for {service_id}")
+    if service.get("endpoint_key") and "latest_check" not in detail:
+        raise SystemExit(f"service detail missing latest_check for {service_id}")
+print(f"  service details: {len(services)}")
+
+print("[REMOTE] bounded check log smoke")
+for node in nodes:
+    node_id = node.get("id")
+    if not node_id:
+        continue
+    path = "/api/v1/nodes/" + urllib.parse.quote(node_id, safe="") + "/checks?window=24h&limit=1"
+    checks = get(path)
+    if "results" not in checks:
+        raise SystemExit(f"node checks missing results for {node_id}")
+    print(f"  node {node_id}: {checks.get('returned', 0)} latest check rows")
+
 for project in projects:
     project_id = project.get("id")
     if not project_id:
@@ -347,7 +393,16 @@ for project in projects:
     checks = get(path)
     if "results" not in checks:
         raise SystemExit(f"project checks missing results for {project_id}")
-    print(f"  {project_id}: {checks.get('returned', 0)} latest check rows")
+    print(f"  project {project_id}: {checks.get('returned', 0)} latest check rows")
+
+service_samples = [service for service in services if service.get("endpoint_key")][:5]
+for service in service_samples:
+    service_id = service.get("id")
+    path = "/api/v1/services/" + urllib.parse.quote(service_id, safe="") + "/checks?window=24h&limit=1"
+    checks = get(path)
+    if "results" not in checks:
+        raise SystemExit(f"service checks missing results for {service_id}")
+    print(f"  service {service_id}: {checks.get('returned', 0)} latest check rows")
 PY
 
 echo "[REMOTE] status-board verification ok"

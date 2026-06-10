@@ -15,6 +15,12 @@ The current frontend should keep calling v1 APIs:
 
 These APIs are latest-state oriented and should remain cheap.
 
+The frontend API client preserves structured backend error details. When a v1
+endpoint returns JSON such as `{"error":"project missing not found"}`, the UI
+error notice includes that detail instead of showing only the HTTP status code.
+This keeps node/project/service drill-down failures actionable without opening
+browser DevTools or server logs first.
+
 ## Future Detail APIs
 
 Implemented detail APIs:
@@ -139,7 +145,9 @@ bounded DNS lookup, and existing SQLite diagnostics only; they do not run Docker
 commands, read Docker sockets, or start a collector. The external
 `make verify-sh-core` acceptance script adds host-level checks that should not
 run inside the app process, including Docker container resource budgets, Nginx
-Basic Auth route checks, and production directory hygiene.
+Basic Auth route checks, production directory hygiene, full node/project/service
+detail API smoke, and bounded check-log smoke for node, project, and service
+drill-down paths.
 
 `/api/v1/diagnostics.projects` exposes a low-load project coverage matrix. Each
 row includes project ID/name/status/detail, service and critical-service counts,

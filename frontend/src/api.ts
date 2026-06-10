@@ -1,83 +1,67 @@
 import type { DiagnosticsResponse, MetricsHistoryResponse, MetricsReportLogsResponse, NodeCheckHistoryResponse, NodeDetailResponse, ProjectCheckHistoryResponse, ProjectDetailResponse, ProjectMetricsHistoryResponse, ServiceCheckHistoryResponse, ServiceDetailResponse, SummaryResponse, TelemetrySchemaResponse } from './types';
 
-export async function fetchSummary(): Promise<SummaryResponse> {
-  const response = await fetch(new URL('api/v1/summary', window.location.href));
-  if (!response.ok) {
-    throw new Error(`API returned ${response.status}`);
+async function apiErrorMessage(response: Response, label: string): Promise<string> {
+  const base = `${label} returned ${response.status}`;
+  const contentType = response.headers.get('content-type') ?? '';
+  try {
+    if (contentType.includes('application/json')) {
+      const data = await response.json() as { error?: unknown; detail?: unknown; message?: unknown };
+      const detail = data.error ?? data.detail ?? data.message;
+      return typeof detail === 'string' && detail.trim() ? `${base}: ${detail}` : base;
+    }
+    const text = await response.text();
+    return text.trim() ? `${base}: ${text.trim().slice(0, 240)}` : base;
+  } catch {
+    return base;
   }
-  return response.json();
+}
+
+async function requestJSON<T>(path: string, label: string): Promise<T> {
+  const response = await fetch(new URL(path, window.location.href));
+  if (!response.ok) {
+    throw new Error(await apiErrorMessage(response, label));
+  }
+  return response.json() as Promise<T>;
+}
+
+export async function fetchSummary(): Promise<SummaryResponse> {
+  return requestJSON<SummaryResponse>('api/v1/summary', 'Summary API');
 }
 
 export async function fetchDiagnostics(): Promise<DiagnosticsResponse> {
-  const response = await fetch(new URL('api/v1/diagnostics', window.location.href));
-  if (!response.ok) {
-    throw new Error(`Diagnostics API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<DiagnosticsResponse>('api/v1/diagnostics', 'Diagnostics API');
 }
 
 export async function fetchProjectDetail(projectId: string): Promise<ProjectDetailResponse> {
-  const response = await fetch(new URL(`api/v1/projects/${encodeURIComponent(projectId)}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Project detail API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<ProjectDetailResponse>(`api/v1/projects/${encodeURIComponent(projectId)}`, 'Project detail API');
 }
 
 export async function fetchProjectMetricsHistory(projectId: string, range = '1h', limit = 3000): Promise<ProjectMetricsHistoryResponse> {
-  const response = await fetch(new URL(`api/v1/projects/${encodeURIComponent(projectId)}/metrics?window=${encodeURIComponent(range)}&limit=${limit}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Project metrics history API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<ProjectMetricsHistoryResponse>(`api/v1/projects/${encodeURIComponent(projectId)}/metrics?window=${encodeURIComponent(range)}&limit=${limit}`, 'Project metrics history API');
 }
 
 export async function fetchProjectChecks(projectId: string, range = '24h', limit = 60): Promise<ProjectCheckHistoryResponse> {
-  const response = await fetch(new URL(`api/v1/projects/${encodeURIComponent(projectId)}/checks?window=${encodeURIComponent(range)}&limit=${limit}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Project checks API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<ProjectCheckHistoryResponse>(`api/v1/projects/${encodeURIComponent(projectId)}/checks?window=${encodeURIComponent(range)}&limit=${limit}`, 'Project checks API');
 }
 
 export async function fetchNodeDetail(nodeId: string): Promise<NodeDetailResponse> {
-  const response = await fetch(new URL(`api/v1/nodes/${encodeURIComponent(nodeId)}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Node detail API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<NodeDetailResponse>(`api/v1/nodes/${encodeURIComponent(nodeId)}`, 'Node detail API');
 }
 
 export async function fetchNodeChecks(nodeId: string, range = '24h', limit = 60): Promise<NodeCheckHistoryResponse> {
-  const response = await fetch(new URL(`api/v1/nodes/${encodeURIComponent(nodeId)}/checks?window=${encodeURIComponent(range)}&limit=${limit}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Node checks API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<NodeCheckHistoryResponse>(`api/v1/nodes/${encodeURIComponent(nodeId)}/checks?window=${encodeURIComponent(range)}&limit=${limit}`, 'Node checks API');
 }
 
 export async function fetchServiceDetail(serviceId: string): Promise<ServiceDetailResponse> {
-  const response = await fetch(new URL(`api/v1/services/${encodeURIComponent(serviceId)}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Service detail API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<ServiceDetailResponse>(`api/v1/services/${encodeURIComponent(serviceId)}`, 'Service detail API');
 }
 
 export async function fetchServiceChecks(serviceId: string, range = '24h', limit = 30): Promise<ServiceCheckHistoryResponse> {
-  const response = await fetch(new URL(`api/v1/services/${encodeURIComponent(serviceId)}/checks?window=${encodeURIComponent(range)}&limit=${limit}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Service checks API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<ServiceCheckHistoryResponse>(`api/v1/services/${encodeURIComponent(serviceId)}/checks?window=${encodeURIComponent(range)}&limit=${limit}`, 'Service checks API');
 }
 
 export async function fetchNodeMetricsHistory(nodeId: string, range = '1h'): Promise<MetricsHistoryResponse> {
-  const response = await fetch(new URL(`api/v1/nodes/${encodeURIComponent(nodeId)}/metrics?window=${encodeURIComponent(range)}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Metrics history API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<MetricsHistoryResponse>(`api/v1/nodes/${encodeURIComponent(nodeId)}/metrics?window=${encodeURIComponent(range)}`, 'Metrics history API');
 }
 
 export async function fetchMetricReportLogs(nodeId = '', limit = 30): Promise<MetricsReportLogsResponse> {
@@ -85,17 +69,9 @@ export async function fetchMetricReportLogs(nodeId = '', limit = 30): Promise<Me
   if (nodeId) {
     params.set('node_id', nodeId);
   }
-  const response = await fetch(new URL(`api/v1/metrics/reports?${params.toString()}`, window.location.href));
-  if (!response.ok) {
-    throw new Error(`Metrics report logs API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<MetricsReportLogsResponse>(`api/v1/metrics/reports?${params.toString()}`, 'Metrics report logs API');
 }
 
 export async function fetchTelemetrySchema(): Promise<TelemetrySchemaResponse> {
-  const response = await fetch(new URL('api/v1/telemetry/schema', window.location.href));
-  if (!response.ok) {
-    throw new Error(`Telemetry schema API returned ${response.status}`);
-  }
-  return response.json();
+  return requestJSON<TelemetrySchemaResponse>('api/v1/telemetry/schema', 'Telemetry schema API');
 }

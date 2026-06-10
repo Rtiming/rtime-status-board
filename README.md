@@ -143,9 +143,9 @@ production directory hygiene, remote tree size, Compose config, running
 containers, status-board container resource budget, expected listening ports,
 Tailnet Nginx health, public Nginx Basic Auth boundaries, health endpoint,
 telemetry schema, metrics agent freshness, collector issues, recent agent
-reports, and project check-log endpoints. It also runs `rtime-doctor` by
-default. To skip the broader rtime network doctor during a quick status-board
-check:
+reports, all node/project/service detail endpoints, and bounded node/project/
+service check-log endpoints. It also runs `rtime-doctor` by default. To skip
+the broader rtime network doctor during a quick status-board check:
 
 ```bash
 RUN_RTIME_DOCTOR=0 make verify-sh-core
