@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -264,6 +265,44 @@ func TestPublicIPEntryCheck(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestEndpointHealthCheck(t *testing.T) {
+	check := endpointHealthCheck("public-https-auth", "network", "https://status.example.com", http.StatusUnauthorized, "ok", deploymentHTTPDoerFunc(func(req *http.Request) (*http.Response, error) {
+		if req.URL.String() != "https://status.example.com/api/v1/health" {
+			t.Fatalf("request URL = %s, want health endpoint", req.URL.String())
+		}
+		return &http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Body:       io.NopCloser(strings.NewReader("unauthorized")),
+		}, nil
+	}))
+	if check.Status != StatusOK || check.Actual != "HTTP 401" {
+		t.Fatalf("check = %#v, want ok HTTP 401", check)
+	}
+
+	badStatus := endpointHealthCheck("tailnet-health", "network", "http://100.64.0.5:18083/", http.StatusOK, "ok", deploymentHTTPDoerFunc(func(*http.Request) (*http.Response, error) {
+		return &http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Body:       io.NopCloser(strings.NewReader("unauthorized")),
+		}, nil
+	}))
+	if badStatus.Status != StatusDegraded || badStatus.Actual != "HTTP 401" {
+		t.Fatalf("bad status check = %#v, want degraded HTTP 401", badStatus)
+	}
+
+	failed := endpointHealthCheck("public-https-auth", "network", "https://status.example.com", http.StatusUnauthorized, "ok", deploymentHTTPDoerFunc(func(*http.Request) (*http.Response, error) {
+		return nil, context.DeadlineExceeded
+	}))
+	if failed.Status != StatusDegraded || failed.Detail != "entry health request failed from the statusd runtime" {
+		t.Fatalf("failed check = %#v, want request failure", failed)
+	}
+}
+
+type deploymentHTTPDoerFunc func(*http.Request) (*http.Response, error)
+
+func (fn deploymentHTTPDoerFunc) Do(req *http.Request) (*http.Response, error) {
+	return fn(req)
 }
 
 func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
@@ -1458,6 +1497,23 @@ func TestAPIRequestIssuesIgnoreHealthyRecentSamples(t *testing.T) {
 	ops := opsWithAPIRequestIssues(OpsDiagnostic{}, requests, now)
 	if len(ops.Issues) != 0 || ops.Counts != (OpsIssueCounts{}) {
 		t.Fatalf("ops = %#v, want no API request issues", ops)
+	}
+}
+
+func TestAPIRequestIssuesIgnoreSlowDiagnosticsRoute(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 0, 0, 0, time.UTC)
+	requests := APIRequestDiagnostic{
+		Total:           2,
+		SlowThresholdMS: 500,
+		Recent: []APIRequestSample{
+			{Method: http.MethodGet, Route: "/api/v1/diagnostics", Status: http.StatusOK, DurationMS: 1500, At: now},
+			{Method: http.MethodGet, Route: "/api/v1/summary", Status: http.StatusOK, DurationMS: 20, At: now.Add(time.Second)},
+		},
+	}
+
+	ops := opsWithAPIRequestIssues(OpsDiagnostic{}, requests, now)
+	if len(ops.Issues) != 0 || ops.Counts != (OpsIssueCounts{}) {
+		t.Fatalf("ops = %#v, want slow diagnostics route ignored", ops)
 	}
 }
 

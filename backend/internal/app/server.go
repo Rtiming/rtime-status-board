@@ -169,14 +169,14 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 	}
 
 	var recentServerErrors int
-	var recentSlow int
 	var latest time.Time
+	slowSamples := []APIRequestSample{}
 	for _, sample := range requests.Recent {
 		if sample.Status >= 500 {
 			recentServerErrors++
 		}
-		if requests.SlowThresholdMS > 0 && sample.DurationMS >= requests.SlowThresholdMS {
-			recentSlow++
+		if isPromotableSlowAPIRequest(sample, requests.SlowThresholdMS) {
+			slowSamples = append(slowSamples, sample)
 		}
 		if sample.At.After(latest) {
 			latest = sample.At
@@ -200,9 +200,9 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 			ObservedAt: latest,
 		})
 	}
-	if recentSlow > 0 {
+	if len(slowSamples) > 0 {
 		routeSummary := summarizeAPIRequestIssueRoutes(requests.Recent, func(sample APIRequestSample) bool {
-			return requests.SlowThresholdMS > 0 && sample.DurationMS >= requests.SlowThresholdMS
+			return isPromotableSlowAPIRequest(sample, requests.SlowThresholdMS)
 		})
 		ops.Issues = append(ops.Issues, OpsIssue{
 			Severity:   "warn",
@@ -210,10 +210,10 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 			SubjectID:  "api-slow",
 			Status:     StatusDegraded,
 			Metric:     "latency",
-			Value:      requests.RecentP95DurationMS,
+			Value:      percentileRecentDuration(slowSamples, 0.95),
 			Limit:      requests.SlowThresholdMS,
 			Unit:       "ms",
-			Detail:     fmt.Sprintf("%d recent API samples exceeded the slow request threshold; routes: %s", recentSlow, routeSummary),
+			Detail:     fmt.Sprintf("%d recent API samples exceeded the slow request threshold; routes: %s", len(slowSamples), routeSummary),
 			ObservedAt: latest,
 		})
 	}
@@ -229,6 +229,13 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 	})
 	ops.Counts = countOpsIssues(ops.Issues)
 	return ops
+}
+
+func isPromotableSlowAPIRequest(sample APIRequestSample, thresholdMS float64) bool {
+	if thresholdMS <= 0 || sample.DurationMS < thresholdMS {
+		return false
+	}
+	return !(sample.Method == http.MethodGet && sample.Route == "/api/v1/diagnostics" && sample.Status < 500)
 }
 
 func summarizeAPIRequestIssueRoutes(samples []APIRequestSample, include func(APIRequestSample) bool) string {

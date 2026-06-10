@@ -137,8 +137,10 @@ Current implementation status:
   itself: production mode, reserved localhost ports, Gatus URL, config/data/
   frontend paths, frontend artifact readability, cache TTL, retention, SQLite
   size budget, Tailnet URL, public IP entry configuration, and public-domain
-  DNS-to-public-IP match. These checks are on-demand local reads plus one
-  bounded DNS lookup only, and avoid Docker socket or shell access from the app.
+  DNS-to-public-IP match. It also performs short health probes for Tailnet,
+  public HTTP, and public HTTPS entries, expecting public entries to return
+  unauthenticated `401`. These checks are on-demand local reads plus bounded
+  DNS/HTTP(S) requests only, and avoid Docker socket or shell access from the app.
 - Diagnostics now includes a project coverage matrix so each project can be
   checked for service count, critical/down/degraded services, Gatus endpoint
   coverage, related nodes, latest metrics-agent coverage, recent check/failure

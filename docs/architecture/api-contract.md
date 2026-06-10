@@ -156,10 +156,12 @@ as `GET /api/v1/nodes/:id/metrics`. It deliberately stores normalized route
 patterns rather than query strings or raw request bodies. Recent bounded samples
 with API 5xx responses or latency above the slow-request threshold are promoted
 into `/api/v1/diagnostics.ops` as `runtime-api` issues. This keeps interface
-failures visible in the action list without adding a log store. Each promoted
-issue includes a short normalized route summary for the recent failing or slow
-samples. It is intended for deployment and growth debugging, especially keeping
-sh-core resource use small.
+failures visible in the action list without adding a log store. Slow successful
+`GET /api/v1/diagnostics` samples remain visible in `runtime.requests` but are
+not promoted into ops issues, because diagnostics is the intentionally heavier
+debug surface. Each promoted issue includes a short normalized route summary for
+the recent failing or slow samples. It is intended for deployment and growth
+debugging, especially keeping sh-core resource use small.
 
 `/api/v1/diagnostics.deployment` exposes low-load deployment-boundary checks for
 the board process. In production it verifies the expected localhost backend
@@ -167,11 +169,13 @@ bind (`127.0.0.1:23180`), Gatus URL (`http://127.0.0.1:23181`), runtime config
 path, SQLite data path, static frontend path, frontend artifact readability,
 summary cache TTL, metrics retention, SQLite size budget, configured Tailnet
 entry, configured public IP entry, and public-domain DNS resolution against the
-configured public IP. The public IP entry check is configuration-only;
-the actual unauthenticated `401` boundary is verified by `make verify-sh-core`.
-The in-process diagnostics use runtime settings, local file stat calls, one
-bounded DNS lookup, and existing SQLite diagnostics only; they do not run Docker
-commands, read Docker sockets, or start a collector. The external
+configured public IP. It also performs short-timeout health probes against the
+configured Tailnet entry, public HTTP entry, and public HTTPS entry. The public
+HTTP/HTTPS probes expect unauthenticated `401` so Basic Auth regressions and
+certificate/SNI errors are visible directly in the Diagnostics tab. The
+in-process diagnostics use runtime settings, local file stat calls, one bounded
+DNS lookup, short HTTP(S) health probes, and existing SQLite diagnostics only;
+they do not run Docker commands, read Docker sockets, or start a collector. The external
 `make verify-sh-core` acceptance script adds host-level checks that should not
 run inside the app process, including Docker container resource budgets, Nginx
 Basic Auth route checks, production directory hygiene, full node/project/service

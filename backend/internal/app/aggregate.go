@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -1470,6 +1472,15 @@ func (a *Aggregator) deploymentDiagnostic(store StoreDiagnostic) DeploymentDiagn
 		add("tailnet-url", "network", tailnetStatus, "configured HTTP(S) Tailnet/private URL", tailnetURL, tailnetDetail)
 		checks = append(checks, publicIPEntryCheck(settings.PublicIP))
 		checks = append(checks, publicDomainDNSCheck(settings.PublicDomain, settings.PublicIP, net.DefaultResolver.LookupHost))
+		if publicEntryReadyForLiveCheck(settings.PublicDomain, settings.PublicIP) {
+			client := &http.Client{Timeout: 1500 * time.Millisecond}
+			checks = append(checks, endpointHealthCheck("tailnet-health", "network", tailnetURL, http.StatusOK, "Tailnet/private Nginx entry returns health without public credentials", client))
+			checks = append(checks, endpointHealthCheck("public-http-auth", "network", publicEntryURL("http", settings.PublicDomain), http.StatusUnauthorized, "public HTTP entry is protected by Basic Auth", client))
+			checks = append(checks, endpointHealthCheck("public-https-auth", "network", publicEntryURL("https", settings.PublicDomain), http.StatusUnauthorized, "public HTTPS entry has a valid certificate and is protected by Basic Auth", client))
+		} else {
+			add("public-http-auth", "network", StatusDegraded, "HTTP 401 from public domain", "", "public HTTP live check skipped because public domain or IP is not configured")
+			add("public-https-auth", "network", StatusDegraded, "HTTPS 401 from public domain", "", "public HTTPS live check skipped because public domain or IP is not configured")
+		}
 	} else {
 		add("production-boundary", "runtime", StatusOK, "production", mode, "production-only boundary checks are skipped outside production mode")
 	}
@@ -1552,6 +1563,77 @@ func publicIPEntryCheck(publicIP string) DeploymentCheck {
 		check.Detail = "expected public IP is not a valid IP address"
 	}
 	return check
+}
+
+type deploymentHTTPDoer interface {
+	Do(*http.Request) (*http.Response, error)
+}
+
+func endpointHealthCheck(key string, category string, baseURL string, expectedStatus int, okDetail string, doer deploymentHTTPDoer) DeploymentCheck {
+	baseURL = normalizeRuntimeURL(baseURL)
+	healthURL := deploymentHealthURL(baseURL)
+	check := DeploymentCheck{
+		Key:      key,
+		Category: category,
+		Status:   StatusOK,
+		Expected: fmt.Sprintf("HTTP %d from %s", expectedStatus, nonEmpty(healthURL, "configured HTTP(S) URL")),
+		Actual:   baseURL,
+		Detail:   okDetail,
+	}
+	if baseURL == "" {
+		check.Status = StatusDegraded
+		check.Detail = "entry URL is not configured"
+		return check
+	}
+	if !strings.HasPrefix(baseURL, "http://") && !strings.HasPrefix(baseURL, "https://") {
+		check.Status = StatusDegraded
+		check.Detail = "entry URL must use HTTP or HTTPS"
+		return check
+	}
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, healthURL, nil)
+	if err != nil {
+		check.Status = StatusDegraded
+		check.Actual = err.Error()
+		check.Detail = "entry health request could not be built"
+		return check
+	}
+	resp, err := doer.Do(req)
+	if err != nil {
+		check.Status = StatusDegraded
+		check.Actual = err.Error()
+		check.Detail = "entry health request failed from the statusd runtime"
+		return check
+	}
+	defer resp.Body.Close()
+	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1024))
+	check.Actual = fmt.Sprintf("HTTP %d", resp.StatusCode)
+	if resp.StatusCode != expectedStatus {
+		check.Status = StatusDegraded
+		check.Detail = fmt.Sprintf("entry health returned HTTP %d, want %d", resp.StatusCode, expectedStatus)
+	}
+	return check
+}
+
+func deploymentHealthURL(baseURL string) string {
+	baseURL = normalizeRuntimeURL(baseURL)
+	if baseURL == "" {
+		return ""
+	}
+	return baseURL + "/api/v1/health"
+}
+
+func publicEntryReadyForLiveCheck(domain string, publicIP string) bool {
+	domain = strings.TrimSpace(domain)
+	publicIP = strings.TrimSpace(publicIP)
+	return domain != "" && domain != "status.example.com" && publicIP != "" && publicIP != "203.0.113.10"
+}
+
+func publicEntryURL(scheme string, domain string) string {
+	domain = strings.TrimSpace(domain)
+	if domain == "" {
+		return ""
+	}
+	return scheme + "://" + domain
 }
 
 func publicDomainDNSCheck(domain string, expectedIP string, lookup func(context.Context, string) ([]string, error)) DeploymentCheck {

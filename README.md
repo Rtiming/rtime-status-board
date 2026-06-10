@@ -184,6 +184,11 @@ Example entries:
 
 Replace these in `.env.production` and
 `deploy/nginx/status.local.conf` for a real deployment.
+`make deploy-sh-core` syncs only non-sensitive public metadata keys from the
+ignored local `.env.production` into the remote `.env.production`:
+`STATUS_BOARD_PUBLIC_DOMAIN`, `STATUS_BOARD_PUBLIC_IP`, and
+`STATUS_BOARD_TAILNET_URL`. Secrets such as heartbeat or agent tokens are not
+copied by this path.
 
 On sh-core, install or refresh the public HTTPS entry with:
 
@@ -262,7 +267,8 @@ Recent API 5xx responses and slow samples are also promoted into
 `/api/v1/diagnostics.ops` as `runtime-api` issues, so interface failures appear
 in the same action list as service, collector, and resource problems. Those
 issues include a short normalized route summary for the recent failing or slow
-samples.
+samples. Slow successful `GET /api/v1/diagnostics` samples remain visible in
+runtime request diagnostics but are not promoted as ops issues.
 
 Future detail and chart APIs are documented in `docs/architecture/api-contract.md`.
 `/api/v1/nodes/:id` returns a lightweight node detail view assembled from
@@ -322,10 +328,12 @@ path, SQLite data path, frontend artifact path, cache TTL, retention, and store
 size budget. It also reports the configured Tailnet URL, public IP entry
 configuration, and public-domain DNS match against the configured public IP, so
 DNS/proxy mistakes are visible from the Diagnostics tab without
-confusing them with the Basic Auth protected public-IP route. It only inspects
-already-loaded settings, local files, one bounded DNS lookup, and existing
-SQLite diagnostics; it does not open a Docker socket, run shell commands, or
-add another process.
+confusing them with the Basic Auth protected public-IP route. Production
+diagnostics also probe Tailnet, public HTTP, and public HTTPS health endpoints
+with short timeouts; public entries are expected to return unauthenticated
+`401`. It only inspects already-loaded settings, local files, bounded DNS/
+HTTP(S) checks, and existing SQLite diagnostics; it does not open a Docker
+socket, run shell commands, or add another process.
 `/api/v1/diagnostics.projects` returns a project coverage matrix assembled from
 existing service config, Gatus endpoint mappings, and latest metrics-agent
 freshness. It shows service counts, critical/down/degraded counts, mapped versus

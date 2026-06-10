@@ -48,6 +48,11 @@ That command uses the ignored real environment file, installs the certificate
 on sh-core, backs up the live Nginx status-board config, and reloads Nginx only
 after `nginx -t` succeeds.
 
+`make deploy-sh-core` may update only these non-sensitive public metadata keys
+in the remote `.env.production`: `STATUS_BOARD_PUBLIC_DOMAIN`,
+`STATUS_BOARD_PUBLIC_IP`, and `STATUS_BOARD_TAILNET_URL`. Do not broaden that
+sync path to copy tokens or full env files.
+
 ## Publishing Rule
 
 Before pushing a public repo, run a sensitive-value scan that excludes generated

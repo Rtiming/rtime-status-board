@@ -344,6 +344,17 @@ nodes = get("/api/v1/nodes")
 projects = get("/api/v1/projects")
 services = get("/api/v1/services")
 
+deployment_diag = diagnostics.get("deployment") or {}
+if deployment_diag.get("status") != "ok":
+    raise SystemExit(f"deployment diagnostics not ok: {deployment_diag}")
+deployment_checks = {row.get("key"): row for row in deployment_diag.get("checks") or []}
+for key in ("tailnet-health", "public-http-auth", "public-https-auth", "public-domain-dns"):
+    row = deployment_checks.get(key)
+    if not row:
+        raise SystemExit(f"deployment diagnostics missing {key}: {deployment_diag}")
+    if row.get("status") != "ok":
+        raise SystemExit(f"deployment diagnostic {key} is not ok: {row}")
+
 request_diag = ((diagnostics.get("runtime") or {}).get("requests") or {})
 if request_diag.get("total", 0) < 1:
     raise SystemExit(f"runtime request diagnostics did not record prior API traffic: {request_diag}")
