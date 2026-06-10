@@ -7,6 +7,8 @@ RTIME_PUSH="$HOME/.ai-skills/rtime-remote/scripts/rtime-push"
 TOKEN="${STATUS_BOARD_AGENT_TOKEN:-}"
 TARGETS="${TARGETS:-sh-core overseas orangepi rpi4 srv03}"
 STATUS_BOARD_ENV_FILE="${STATUS_BOARD_ENV_FILE:-$ROOT/.env.production}"
+STATUS_BOARD_REMOTE_ENV_NODE="${STATUS_BOARD_REMOTE_ENV_NODE:-sh-core}"
+STATUS_BOARD_REMOTE_ENV_FILE="${STATUS_BOARD_REMOTE_ENV_FILE:-/opt/rtime-status-board/.env.production}"
 COLLECT_CONTAINERS="${STATUS_BOARD_COLLECT_CONTAINERS:-1}"
 COLLECT_PROCESSES="${STATUS_BOARD_COLLECT_PROCESSES:-1}"
 GPU_INTERVAL_SECONDS="${STATUS_BOARD_GPU_INTERVAL_SECONDS:-120}"
@@ -22,13 +24,27 @@ read_env_value() {
   fi
 }
 
+read_remote_env_value() {
+  local key="$1"
+  "$RTIME_SSH" "$STATUS_BOARD_REMOTE_ENV_NODE" "if [ -f '$STATUS_BOARD_REMOTE_ENV_FILE' ]; then awk -F= -v key='$key' '\$1 == key { sub(/^[^=]*=/, \"\"); gsub(/^\"|\"$/, \"\"); print; exit }' '$STATUS_BOARD_REMOTE_ENV_FILE'; fi"
+}
+
 if [[ -z "$TOKEN" ]]; then
   TOKEN="$(read_env_value STATUS_BOARD_AGENT_TOKEN)"
+fi
+if [[ -z "$TOKEN" ]]; then
+  TOKEN="$(read_remote_env_value STATUS_BOARD_AGENT_TOKEN)"
 fi
 
 STATUS_BOARD_URL="${STATUS_BOARD_URL:-$(read_env_value STATUS_BOARD_URL)}"
 if [[ -z "$STATUS_BOARD_URL" ]]; then
+  STATUS_BOARD_URL="$(read_remote_env_value STATUS_BOARD_URL)"
+fi
+if [[ -z "$STATUS_BOARD_URL" ]]; then
   tailnet_url="${STATUS_BOARD_TAILNET_URL:-$(read_env_value STATUS_BOARD_TAILNET_URL)}"
+  if [[ -z "$tailnet_url" ]]; then
+    tailnet_url="$(read_remote_env_value STATUS_BOARD_TAILNET_URL)"
+  fi
   tailnet_url="${tailnet_url:-http://100.64.10.5:18083}"
   STATUS_BOARD_URL="${tailnet_url%/}/api/v1/metrics/report/v2"
 fi

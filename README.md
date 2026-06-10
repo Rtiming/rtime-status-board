@@ -240,7 +240,10 @@ systemd or user-cron environment. The self-test collects the v2 payload once,
 prints a redacted collector summary, and exits non-zero only when required base
 collectors such as CPU, storage, or network fail. Optional GPU, container, and
 process collectors are reported in the summary without requiring a GPU or
-Docker socket to exist on every node.
+Docker socket to exist on every node. If the ignored local `.env.production`
+does not contain `STATUS_BOARD_AGENT_TOKEN`, the installer reads it from
+`sh-core:/opt/rtime-status-board/.env.production` by default and keeps it only
+inside the install process.
 
 The default agent remains low-load: base collectors run once per minute, while
 GPU is locally cached for 120s and container/process snapshots for 300s. Tune
