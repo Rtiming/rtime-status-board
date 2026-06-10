@@ -471,6 +471,15 @@ type ProjectDiagnostic struct {
 	LastCheckAt           *time.Time `json:"last_check_at,omitempty"`
 	RecentEventCount      int        `json:"recent_event_count"`
 	LastEventAt           *time.Time `json:"last_event_at,omitempty"`
+	OpsStatus             Status     `json:"ops_status"`
+	OpsIssueCount         int        `json:"ops_issue_count"`
+	OpsErrorCount         int        `json:"ops_error_count"`
+	OpsWarnCount          int        `json:"ops_warn_count"`
+	OpsInfoCount          int        `json:"ops_info_count"`
+	OpsIssueKinds         []string   `json:"ops_issue_kinds,omitempty"`
+	OpsAffectedNodes      []string   `json:"ops_affected_nodes,omitempty"`
+	OpsAffectedServices   []string   `json:"ops_affected_services,omitempty"`
+	OpsDetail             string     `json:"ops_detail"`
 }
 
 type AgentNodeDiagnostic struct {

@@ -356,6 +356,18 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 		{Kind: "service", SubjectID: "svc-down", CreatedAt: base.Add(-3 * time.Minute)},
 		{Kind: "node", SubjectID: "node-a", CreatedAt: base.Add(-time.Minute)},
 		{Kind: "project", SubjectID: "other-project", CreatedAt: base},
+	}, []OpsProjectImpact{
+		{
+			ProjectID:        "project-a",
+			ProjectName:      "Project A",
+			Status:           StatusDegraded,
+			IssueCount:       2,
+			WarnCount:        2,
+			AffectedNodes:    []string{"node-a"},
+			AffectedServices: []string{"svc-down"},
+			IssueKinds:       []string{"status-volatility"},
+			Detail:           "2 issues across 1 kinds",
+		},
 	})
 	if len(diag) != 1 {
 		t.Fatalf("project diagnostics = %#v, want one row", diag)
@@ -394,6 +406,12 @@ func TestProjectDiagnosticsCoverageIssues(t *testing.T) {
 	if row.RecentEventCount != 3 || row.LastEventAt == nil || !row.LastEventAt.Equal(base.Add(-time.Minute)) {
 		t.Fatalf("recent event summary = %#v, want 3 related events and latest node event", row)
 	}
+	if row.OpsStatus != StatusDegraded || row.OpsIssueCount != 2 || row.OpsWarnCount != 2 || row.OpsErrorCount != 0 {
+		t.Fatalf("ops impact = %#v, want degraded project impact with two warnings", row)
+	}
+	if !stringSliceEqual(row.OpsIssueKinds, []string{"status-volatility"}) || !stringSliceEqual(row.OpsAffectedNodes, []string{"node-a"}) || !stringSliceEqual(row.OpsAffectedServices, []string{"svc-down"}) {
+		t.Fatalf("ops impact detail = kinds:%#v nodes:%#v services:%#v", row.OpsIssueKinds, row.OpsAffectedNodes, row.OpsAffectedServices)
+	}
 }
 
 func TestProjectDiagnosticsFlagsMissingRecentCheckLogs(t *testing.T) {
@@ -409,7 +427,7 @@ func TestProjectDiagnosticsFlagsMissingRecentCheckLogs(t *testing.T) {
 		ReportingNodes: []string{"node-a"},
 	}, []RuntimeEndpointStatus{
 		{Key: "endpoint-a", Status: StatusOK, RecentResults: 0, RecentFailures: 0, ResponseTimeMS: 3},
-	}, nil)
+	}, nil, nil)
 
 	if len(diag) != 1 {
 		t.Fatalf("project diagnostics = %#v, want one row", diag)

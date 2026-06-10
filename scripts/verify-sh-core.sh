@@ -418,6 +418,7 @@ if runtime_diagnostics_issues:
 ops_diag = diagnostics.get("ops") or {}
 if "project_impacts" not in ops_diag:
     raise SystemExit(f"ops diagnostics missing project_impacts: {ops_diag}")
+project_impacts_by_id = {impact.get("project_id"): impact for impact in ops_diag.get("project_impacts") or []}
 for impact in ops_diag.get("project_impacts") or []:
     for key in ("project_id", "project_name", "status", "issue_count", "error_count", "warn_count", "info_count", "detail"):
         if key not in impact:
@@ -490,7 +491,7 @@ if status_board_budget.get("memory_headroom_bytes", 0) <= 0 or status_board_budg
 if len(project_diag) != len(projects):
     raise SystemExit(f"project diagnostics rows = {len(project_diag)}, want {len(projects)}: {project_diag}")
 for row in project_diag:
-    for key in ("project_id", "status", "service_count", "endpoint_count", "check_coverage_percent", "recent_check_count", "recent_success_count", "recent_failure_count", "recent_failure_percent", "no_recent_check_count", "current_avg_response_time_ms", "current_max_response_time_ms", "detail"):
+    for key in ("project_id", "status", "service_count", "endpoint_count", "check_coverage_percent", "recent_check_count", "recent_success_count", "recent_failure_count", "recent_failure_percent", "no_recent_check_count", "current_avg_response_time_ms", "current_max_response_time_ms", "ops_status", "ops_issue_count", "ops_error_count", "ops_warn_count", "ops_info_count", "ops_detail", "detail"):
         if key not in row:
             raise SystemExit(f"project diagnostics row missing {key}: {row}")
     if row.get("status") != "ok":
@@ -507,6 +508,15 @@ for row in project_diag:
         raise SystemExit(f"project diagnostics row has endpoints without recent logs: {row}")
     if row.get("current_avg_response_time_ms", -1) < 0 or row.get("current_max_response_time_ms", -1) < 0:
         raise SystemExit(f"project diagnostics row has invalid response latency fields: {row}")
+    impact = project_impacts_by_id.get(row.get("project_id"))
+    if impact:
+        if row.get("ops_status") != impact.get("status"):
+            raise SystemExit(f"project diagnostics ops status mismatch for {row.get('project_id')}: row={row} impact={impact}")
+        for left, right in (("ops_issue_count", "issue_count"), ("ops_error_count", "error_count"), ("ops_warn_count", "warn_count"), ("ops_info_count", "info_count")):
+            if row.get(left) != impact.get(right):
+                raise SystemExit(f"project diagnostics {left} mismatch for {row.get('project_id')}: row={row} impact={impact}")
+    elif row.get("ops_status") != "ok" or row.get("ops_issue_count", 0) != 0:
+        raise SystemExit(f"project diagnostics has ops impact without ops project impact row: {row}")
 
 if len(metrics) != EXPECTED_NODE_COUNT:
     raise SystemExit(f"metrics node count = {len(metrics)}, want {EXPECTED_NODE_COUNT}")

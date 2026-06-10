@@ -479,6 +479,15 @@ export interface ProjectDiagnostic {
   last_check_at?: string;
   recent_event_count: number;
   last_event_at?: string;
+  ops_status: Status;
+  ops_issue_count: number;
+  ops_error_count: number;
+  ops_warn_count: number;
+  ops_info_count: number;
+  ops_issue_kinds?: string[];
+  ops_affected_nodes?: string[];
+  ops_affected_services?: string[];
+  ops_detail: string;
 }
 
 export interface AgentNodeDiagnostic {

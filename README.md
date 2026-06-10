@@ -350,7 +350,10 @@ missing endpoint coverage, related nodes, and metric-report coverage per
 project. It also summarizes recent Gatus check rows, success/failure counts,
 failure rate, mapped endpoints without recent logs, current average/max response
 time, latest check time, related status-change events, and latest event time per
-project. It performs no additional checks and writes no history.
+project. It also embeds the matching `ops.project_impacts` rollup fields
+(`ops_status`, severity counts, issue kinds, affected nodes/services, and
+detail) so a project row can show service-check health and operational impact
+side by side. It performs no additional checks and writes no history.
 `/api/v1/diagnostics.event_log` embeds a bounded newest-first status-change log
 from SQLite. It returns total event rows, returned rows, latest event time,
 kind counts, target-status counts, and the latest events. It is read-only and

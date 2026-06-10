@@ -144,6 +144,7 @@ export function Diagnostics({
                   <th>{t.endpoints}</th>
                   <th>{t.metricsCoverage}</th>
                   <th>{t.projectActivity}</th>
+                  <th>{t.opsImpact}</th>
                   <th>{t.detail}</th>
                 </tr>
               </thead>
@@ -180,6 +181,14 @@ export function Diagnostics({
                       <span>{t.currentLatency}: {formatLatencyPair(project.current_avg_response_time_ms, project.current_max_response_time_ms, t.avgLatency, t.maxLatency)}</span>
                       <span>{t.last}: {formatTime(project.last_check_at)}</span>
                       <span>{t.projectRecentEvents}: {project.recent_event_count ?? 0} · {t.last}: {formatTime(project.last_event_at)}</span>
+                    </td>
+                    <td>
+                      <StatusPill status={project.ops_status ?? 'ok'} lang={lang} />
+                      <span>{t.opsIssues}: {project.ops_issue_count ?? 0}</span>
+                      <span>{t.issueError}: {project.ops_error_count ?? 0} · {t.issueWarn}: {project.ops_warn_count ?? 0} · {t.issueInfo}: {project.ops_info_count ?? 0}</span>
+                      <span>{t.issueKinds}: {formatList(project.ops_issue_kinds)}</span>
+                      <span>{t.node}: {formatList(project.ops_affected_nodes)} · {t.service}: {formatList(project.ops_affected_services)}</span>
+                      <span>{project.ops_detail || '-'}</span>
                     </td>
                     <td>{project.detail}</td>
                   </tr>

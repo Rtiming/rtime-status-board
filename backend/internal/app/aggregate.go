@@ -504,7 +504,7 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 	deployment := a.deploymentDiagnostic(storeDiagnostic)
 	recordStage("deployment-checks", deploymentStart, deployment.Status, fmt.Sprintf("%d deployment checks", len(deployment.Checks)))
 	projectDiagnosticsStart := time.Now()
-	projectDiagnostics := a.projectDiagnostics(projects, services, metricsDiagnostic, endpoints, recentEvents)
+	projectDiagnostics := a.projectDiagnostics(projects, services, metricsDiagnostic, endpoints, recentEvents, ops.ProjectImpacts)
 	recordStage("project-diagnostics", projectDiagnosticsStart, StatusOK, fmt.Sprintf("%d project rows", len(projectDiagnostics)))
 	eventLog := eventLogDiagnostic(storeDiagnostic.EventRows, recentEvents)
 	agentHealthStart := time.Now()
@@ -743,7 +743,7 @@ func eventLogDiagnostic(total int, events []Event) EventLogDiagnostic {
 	return diag
 }
 
-func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []ServiceView, metricsDiagnostic MetricsDiagnostic, endpoints []RuntimeEndpointStatus, events []Event) []ProjectDiagnostic {
+func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []ServiceView, metricsDiagnostic MetricsDiagnostic, endpoints []RuntimeEndpointStatus, events []Event, impacts []OpsProjectImpact) []ProjectDiagnostic {
 	endpointKeys := map[string]bool{}
 	endpointStatusByKey := map[string]RuntimeEndpointStatus{}
 	for _, endpoint := range endpoints {
@@ -755,6 +755,12 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 	reportingNodes := stringSet(metricsDiagnostic.ReportingNodes)
 	missingNodes := stringSet(metricsDiagnostic.MissingNodes)
 	staleNodes := stringSet(metricsDiagnostic.StaleNodes)
+	impactByProject := map[string]OpsProjectImpact{}
+	for _, impact := range impacts {
+		if impact.ProjectID != "" {
+			impactByProject[impact.ProjectID] = impact
+		}
+	}
 
 	diagnostics := make([]ProjectDiagnostic, 0, len(projects))
 	for _, project := range projects {
@@ -763,6 +769,8 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 			ProjectName: project.Name,
 			Status:      project.Status,
 			Detail:      "project monitoring coverage is complete",
+			OpsStatus:   StatusOK,
+			OpsDetail:   "no active ops impact",
 		}
 		nodeSet := map[string]bool{}
 		serviceSet := map[string]bool{}
@@ -846,6 +854,17 @@ func (a *Aggregator) projectDiagnostics(projects []ProjectView, services []Servi
 		diag.MetricsReportingNodes = sortedKeys(metricsReporting)
 		diag.MetricsMissingNodes = sortedKeys(metricsMissing)
 		diag.MetricsStaleNodes = sortedKeys(metricsStale)
+		if impact, ok := impactByProject[project.ID]; ok {
+			diag.OpsStatus = impact.Status
+			diag.OpsIssueCount = impact.IssueCount
+			diag.OpsErrorCount = impact.ErrorCount
+			diag.OpsWarnCount = impact.WarnCount
+			diag.OpsInfoCount = impact.InfoCount
+			diag.OpsIssueKinds = impact.IssueKinds
+			diag.OpsAffectedNodes = impact.AffectedNodes
+			diag.OpsAffectedServices = impact.AffectedServices
+			diag.OpsDetail = impact.Detail
+		}
 		details := []string{}
 		if diag.ServiceCount == 0 {
 			details = append(details, "project has no mapped services")

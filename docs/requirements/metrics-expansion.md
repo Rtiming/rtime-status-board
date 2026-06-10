@@ -194,6 +194,10 @@ Current implementation status:
   counts, failure percentage, endpoints without recent logs, and current
   average/max response time. It is computed from the same already-loaded Gatus
   endpoint status rows.
+- The same project coverage rows also include the matching Ops impact rollup:
+  `ops_status`, severity counts, issue kinds, affected nodes/services, and
+  detail. This keeps project rows tied to the action-oriented Ops digest without
+  adding another query, collector, or polling loop.
 - Project detail now also shows a bounded related-node Agent report view by
   reading `GET /api/v1/metrics/reports?limit=100` once and filtering to the
   project's nodes. This gives project-level collector freshness, lag, schema,
