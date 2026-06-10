@@ -44,6 +44,8 @@ export function Diagnostics({
   const opsIssues = diagnostics.ops?.issues ?? [];
   const opsCounts = diagnostics.ops?.counts ?? { error: 0, warn: 0, info: 0 };
   const projectImpacts = diagnostics.ops?.project_impacts ?? [];
+  const statusVolatility = diagnostics.ops?.status_volatility;
+  const volatileSubjects = statusVolatility?.subjects ?? [];
   const resourceThresholds = diagnostics.ops?.resource_thresholds ?? [];
   const resourceStates = diagnostics.ops?.resource_states ?? [];
   const eventLog = diagnostics.event_log;
@@ -299,6 +301,58 @@ export function Diagnostics({
               </div>
             ))}
           </div>
+        )}
+        {volatileSubjects.length > 0 && (
+          <>
+            <h3 className="panel-subtitle">{t.statusVolatility}</h3>
+            <div className="diag-kv compact-kv project-history-meta">
+              <span>{t.window}</span>
+              <strong>{formatSeconds(statusVolatility?.window_seconds ?? 0)}</strong>
+              <span>{t.changeThreshold}</span>
+              <strong>{formatCount(statusVolatility?.change_threshold ?? 0)}</strong>
+            </div>
+            <div className="inline-table status-volatility-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>{t.kind}</th>
+                    <th>{t.target}</th>
+                    <th>{t.statusChanges}</th>
+                    <th>{t.transition}</th>
+                    <th>{t.updated}</th>
+                    <th>{t.detail}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {volatileSubjects.map((subject) => (
+                    <tr key={`${subject.kind}-${subject.subject_id}`}>
+                      <td>{subject.kind}</td>
+                      <td>
+                        <strong>{subject.label || subject.subject_id}</strong>
+                        <span>{subject.subject_id}</span>
+                      </td>
+                      <td>
+                        <strong>{formatCount(subject.change_count)}</strong>
+                        <StatusPill status={subject.status} lang={lang} />
+                      </td>
+                      <td>
+                        <div className="event-transition">
+                          {subject.latest_from ? <StatusPill status={subject.latest_from} lang={lang} /> : <span>-</span>}
+                          <span>-&gt;</span>
+                          <StatusPill status={subject.latest_to} lang={lang} />
+                        </div>
+                      </td>
+                      <td>{formatTime(subject.latest_at)}</td>
+                      <td>
+                        {subject.detail}
+                        {subject.latest_detail && <span>{subject.latest_detail}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
         )}
         {resourceStates.length > 0 && (
           <>

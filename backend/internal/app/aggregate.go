@@ -35,6 +35,9 @@ const (
 	defaultMemoryThresholdPercent   = 90
 	defaultRootDiskThresholdPercent = 85
 	defaultGPUUtilThresholdPercent  = 90
+	statusVolatilityWindow          = 24 * time.Hour
+	statusVolatilityThreshold       = 3
+	statusVolatilityLimit           = 20
 )
 
 func NewAggregator(config *AppConfig, store *Store, gatus *GatusClient, ttl time.Duration) *Aggregator {
@@ -461,10 +464,11 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 	if recentEventsErr != nil {
 		recentEvents = []Event{}
 	}
+	statusVolatility, statusVolatilityErr := a.statusVolatilityDiagnostic(ctx, generatedAt)
 	storeDiagnostic, storeDiagnosticErr := a.storeDiagnostic(ctx)
 	issues := a.configIssues(endpoints, gatusErr)
 	failures := failingServices(services)
-	ops := a.opsDiagnostic(generatedAt, services, metrics, metricsDiagnostic, issues)
+	ops := a.opsDiagnostic(generatedAt, services, metrics, metricsDiagnostic, issues, statusVolatility)
 	deployment := a.deploymentDiagnostic(storeDiagnostic)
 	projectDiagnostics := a.projectDiagnostics(projects, services, metricsDiagnostic, endpoints, recentEvents)
 	eventLog := eventLogDiagnostic(storeDiagnostic.EventRows, recentEvents)
@@ -500,8 +504,8 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 		},
 		{
 			Name:      "sqlite",
-			Status:    providerStatus(metricsErr == nil && agentReportsErr == nil && recentEventsErr == nil && storeDiagnosticErr == nil, true),
-			Detail:    providerDetail(firstErr(metricsErr, agentReportsErr, recentEventsErr, storeDiagnosticErr), "store is readable"),
+			Status:    providerStatus(metricsErr == nil && agentReportsErr == nil && recentEventsErr == nil && statusVolatilityErr == nil && storeDiagnosticErr == nil, true),
+			Detail:    providerDetail(firstErr(metricsErr, agentReportsErr, recentEventsErr, statusVolatilityErr, storeDiagnosticErr), "store is readable"),
 			CheckedAt: generatedAt,
 		},
 		{
@@ -865,7 +869,33 @@ func sortedKeys(values map[string]bool) []string {
 	return keys
 }
 
-func (a *Aggregator) opsDiagnostic(now time.Time, services []ServiceView, metrics []MetricsView, metricsDiagnostic MetricsDiagnostic, configIssues []ConfigIssue) OpsDiagnostic {
+func (a *Aggregator) statusVolatilityDiagnostic(ctx context.Context, now time.Time) (StatusVolatilityDiagnostic, error) {
+	diag := StatusVolatilityDiagnostic{
+		WindowSeconds:   statusVolatilityWindow.Seconds(),
+		ChangeThreshold: statusVolatilityThreshold,
+		Subjects:        []StatusVolatilitySubject{},
+	}
+	if a.store == nil {
+		return diag, nil
+	}
+	subjects, err := a.store.StatusVolatility(ctx, now.Add(-statusVolatilityWindow), statusVolatilityLimit)
+	if err != nil {
+		return diag, err
+	}
+	for i := range subjects {
+		subject := &subjects[i]
+		if subject.ChangeCount >= statusVolatilityThreshold {
+			subject.Status = StatusDegraded
+		} else {
+			subject.Status = StatusOK
+		}
+		subject.Detail = fmt.Sprintf("%d status changes in the last %.0fh; latest %s -> %s", subject.ChangeCount, statusVolatilityWindow.Hours(), nonEmpty(string(subject.LatestFrom), "-"), nonEmpty(string(subject.LatestTo), "-"))
+	}
+	diag.Subjects = subjects
+	return diag, nil
+}
+
+func (a *Aggregator) opsDiagnostic(now time.Time, services []ServiceView, metrics []MetricsView, metricsDiagnostic MetricsDiagnostic, configIssues []ConfigIssue, volatility StatusVolatilityDiagnostic) OpsDiagnostic {
 	issues := []OpsIssue{}
 
 	for _, service := range services {
@@ -963,6 +993,30 @@ func (a *Aggregator) opsDiagnostic(now time.Time, services []ServiceView, metric
 	for _, metric := range metrics {
 		issues = append(issues, resourceThresholdIssues(metric, now, a.resourceThresholdsForNode(metric.NodeID))...)
 	}
+	for _, subject := range volatility.Subjects {
+		if subject.ChangeCount < volatility.ChangeThreshold {
+			continue
+		}
+		issue := OpsIssue{
+			Severity:    "warn",
+			Kind:        "status-volatility",
+			SubjectID:   subject.SubjectID,
+			SubjectName: subject.Label,
+			Status:      subject.Status,
+			Metric:      "status_changes",
+			Detail:      subject.Detail,
+			ObservedAt:  subject.LatestAt,
+		}
+		switch subject.Kind {
+		case "service":
+			issue.ServiceID = subject.SubjectID
+		case "node":
+			issue.NodeID = subject.SubjectID
+		case "project":
+			issue.ProjectID = subject.SubjectID
+		}
+		issues = append(issues, issue)
+	}
 
 	sort.Slice(issues, func(i, j int) bool {
 		if severityRank(issues[i].Severity) == severityRank(issues[j].Severity) {
@@ -983,6 +1037,7 @@ func (a *Aggregator) opsDiagnostic(now time.Time, services []ServiceView, metric
 		Issues:             issues,
 		Counts:             countOpsIssues(issues),
 		ProjectImpacts:     a.projectImpacts(issues),
+		StatusVolatility:   volatility,
 		ResourceThresholds: a.resourceThresholdViews(metricsDiagnostic.ExpectedNodes),
 		ResourceStates:     a.resourceStates(now, metrics),
 	}

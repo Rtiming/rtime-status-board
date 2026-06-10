@@ -133,6 +133,10 @@ Current implementation status:
   into `runtime-api` issues, so backend interface failures are visible beside
   service, collector, config, and resource problems without opening container
   logs first.
+- The ops digest now includes status-volatility diagnostics from existing
+  SQLite status-change events. The first version uses a fixed 24h window and a
+  threshold of three changes per node/project/service, adding only one bounded
+  indexed read to the Diagnostics request.
 - Diagnostics now includes deployment-boundary checks for the board runtime
   itself: production mode, reserved localhost ports, Gatus URL, config/data/
   frontend paths, frontend artifact readability, cache TTL, retention, SQLite

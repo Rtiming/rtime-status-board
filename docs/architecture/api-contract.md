@@ -208,8 +208,11 @@ loop.
 `/api/v1/diagnostics.ops` is a low-load issue digest assembled from the same
 latest-state sources: non-OK services, missing/stale agents, collector issues,
 service resource budget issues, config warnings/errors, recent API request
-health issues, and latest node/GPU threshold checks. It returns `issues`,
-`counts.error/warn/info`, and
+health issues, recent status volatility, and latest node/GPU threshold checks.
+Status volatility is calculated from existing SQLite status-transition events
+over the last 24h; subjects with at least three changes are promoted as
+`status-volatility` warnings and also appear in `status_volatility.subjects`.
+It returns `issues`, `counts.error/warn/info`, and
 `resource_thresholds` with the effective per-node CPU, memory, root disk, GPU
 utilization, network RX/TX rate, and storage read/write rate limits used for
 those checks. The thresholds come from `config/status-board.yaml` under

@@ -486,6 +486,7 @@ export interface OpsDiagnostic {
   issues: OpsIssue[];
   counts: OpsIssueCounts;
   project_impacts?: OpsProjectImpact[];
+  status_volatility?: StatusVolatilityDiagnostic;
   resource_thresholds: EffectiveResourceThreshold[];
   resource_states: OpsResourceState[];
 }
@@ -524,6 +525,25 @@ export interface OpsProjectImpact {
   affected_nodes?: string[];
   affected_services?: string[];
   issue_kinds?: string[];
+  detail: string;
+}
+
+export interface StatusVolatilityDiagnostic {
+  window_seconds: number;
+  change_threshold: number;
+  subjects: StatusVolatilitySubject[];
+}
+
+export interface StatusVolatilitySubject {
+  kind: string;
+  subject_id: string;
+  label: string;
+  change_count: number;
+  status: Status;
+  latest_from?: Status;
+  latest_to: Status;
+  latest_detail: string;
+  latest_at: string;
   detail: string;
 }
 

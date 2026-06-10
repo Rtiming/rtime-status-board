@@ -353,11 +353,15 @@ reuses the existing status transition table; it does not add another collector
 or polling loop.
 `/api/v1/diagnostics.ops` is the action-oriented troubleshooting digest. It
 aggregates existing check failures, missing/stale agents, collector issues,
-service resource budget issues, config warnings, and latest resource threshold
-breaches. Resource thresholds are configured in `config/status-board.yaml`
-under `diagnostics.resource_thresholds`; the default profile is CPU `90%`,
-memory `90%`, root disk `85%`, GPU utilization `90%`, network RX/TX
-`50MiB/s`, and storage read/write `100MiB/s`. The diagnostics payload also
+service resource budget issues, config warnings, recent status volatility, and
+latest resource threshold breaches. Status volatility is computed from the
+existing SQLite status-transition table over the last 24h; three or more
+changes for the same node/project/service become a warning in Ops, without a
+new collector or background task. Resource thresholds are configured in
+`config/status-board.yaml` under `diagnostics.resource_thresholds`; the default
+profile is CPU `90%`, memory `90%`, root disk `85%`, GPU utilization `90%`,
+network RX/TX `50MiB/s`, and storage read/write `100MiB/s`. The diagnostics
+payload also
 returns the effective per-node thresholds so alert tuning can be checked without
 opening the server config. It also returns `ops.resource_states`, a per-node
 current/limit/headroom view assembled from existing latest metrics only; this is

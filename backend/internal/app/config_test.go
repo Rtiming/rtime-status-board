@@ -541,7 +541,7 @@ func TestOpsDiagnosticAggregatesActionableIssues(t *testing.T) {
 			{ServiceID: "svc-heavy", ServiceName: "Heavy Service", NodeID: "node-a", Severity: "warn", Metric: "memory", Value: 200, Limit: 100, Unit: "MiB", Detail: "memory exceeds budget"},
 		},
 	}
-	ops := aggregator.opsDiagnostic(now, services, metrics, metricDiag, []ConfigIssue{{Severity: "warn", Kind: "service-endpoint", SubjectID: "svc-missing", Detail: "endpoint missing"}})
+	ops := aggregator.opsDiagnostic(now, services, metrics, metricDiag, []ConfigIssue{{Severity: "warn", Kind: "service-endpoint", SubjectID: "svc-missing", Detail: "endpoint missing"}}, StatusVolatilityDiagnostic{})
 
 	kinds := map[string]bool{}
 	for _, issue := range ops.Issues {
@@ -603,7 +603,23 @@ func TestOpsDiagnosticBuildsProjectImpacts(t *testing.T) {
 		},
 	}
 
-	ops := aggregator.opsDiagnostic(now, services, nil, metricDiag, nil)
+	ops := aggregator.opsDiagnostic(now, services, nil, metricDiag, nil, StatusVolatilityDiagnostic{
+		WindowSeconds:   statusVolatilityWindow.Seconds(),
+		ChangeThreshold: statusVolatilityThreshold,
+		Subjects: []StatusVolatilitySubject{
+			{
+				Kind:        "service",
+				SubjectID:   "svc-b",
+				Label:       "B Service",
+				ChangeCount: statusVolatilityThreshold,
+				Status:      StatusDegraded,
+				LatestFrom:  StatusOK,
+				LatestTo:    StatusDegraded,
+				LatestAt:    now.Add(-2 * time.Minute),
+				Detail:      "3 status changes in the last 24h; latest ok -> degraded",
+			},
+		},
+	})
 	impacts := map[string]OpsProjectImpact{}
 	for _, impact := range ops.ProjectImpacts {
 		impacts[impact.ProjectID] = impact
@@ -616,11 +632,14 @@ func TestOpsDiagnosticBuildsProjectImpacts(t *testing.T) {
 		t.Fatalf("project-a affected = nodes:%#v services:%#v, want node-a and svc-critical", projectA.AffectedNodes, projectA.AffectedServices)
 	}
 	projectB := impacts["project-b"]
-	if projectB.ProjectName != "Project B" || projectB.Status != StatusDegraded || projectB.WarnCount != 1 {
-		t.Fatalf("project-b impact = %#v, want one warning", projectB)
+	if projectB.ProjectName != "Project B" || projectB.Status != StatusDegraded || projectB.WarnCount != 2 {
+		t.Fatalf("project-b impact = %#v, want collector and volatility warnings", projectB)
 	}
-	if !stringSliceEqual(projectB.IssueKinds, []string{"collector"}) {
-		t.Fatalf("project-b kinds = %#v, want collector", projectB.IssueKinds)
+	if !stringSliceEqual(projectB.IssueKinds, []string{"collector", "status-volatility"}) {
+		t.Fatalf("project-b kinds = %#v, want collector and status-volatility", projectB.IssueKinds)
+	}
+	if len(ops.StatusVolatility.Subjects) != 1 || ops.StatusVolatility.Subjects[0].SubjectID != "svc-b" {
+		t.Fatalf("status volatility = %#v, want svc-b", ops.StatusVolatility)
 	}
 }
 
@@ -680,6 +699,7 @@ func TestOpsDiagnosticUsesConfiguredResourceThresholds(t *testing.T) {
 		metrics,
 		MetricsDiagnostic{ExpectedNodes: []string{"node-a"}, ReportingNodes: []string{"node-a"}},
 		nil,
+		StatusVolatilityDiagnostic{},
 	)
 
 	limitsByKind := map[string]float64{}
@@ -742,7 +762,7 @@ func TestOpsDiagnosticIsEmptyWhenHealthy(t *testing.T) {
 	services := []ServiceView{{ServiceConfig: ServiceConfig{ID: "svc-ok", Name: "OK Service", NodeID: "node-a"}, Status: StatusOK, Detail: "Healthy"}}
 	metrics := []MetricsView{{MetricsReport: MetricsReport{NodeID: "node-a", CPU: CPUMetrics{Percent: 12}, Memory: MemoryMetrics{Percent: 34}, Disk: DiskMetrics{Percent: 45}}, UpdatedAt: now}}
 	metricDiag := MetricsDiagnostic{ExpectedNodes: []string{"node-a"}, ReportingNodes: []string{"node-a"}}
-	ops := aggregator.opsDiagnostic(now, services, metrics, metricDiag, nil)
+	ops := aggregator.opsDiagnostic(now, services, metrics, metricDiag, nil, StatusVolatilityDiagnostic{})
 	if len(ops.Issues) != 0 || ops.Counts.Error != 0 || ops.Counts.Warn != 0 || ops.Counts.Info != 0 {
 		t.Fatalf("ops = %#v, want no issues", ops)
 	}
@@ -1678,6 +1698,48 @@ func TestDiagnosticsIncludesEventLog(t *testing.T) {
 	}
 	if diag.EventLog.StatusCounts.Down != 1 || diag.EventLog.StatusCounts.OK != 0 {
 		t.Fatalf("status counts = %#v, want one down transition target", diag.EventLog.StatusCounts)
+	}
+}
+
+func TestStoreStatusVolatility(t *testing.T) {
+	store, err := OpenStore(filepath.Join(t.TempDir(), "status-board.db"))
+	if err != nil {
+		t.Fatalf("open store: %v", err)
+	}
+	defer store.Close()
+
+	ctx := context.Background()
+	for _, status := range []Status{StatusOK, StatusDown, StatusOK, StatusDegraded} {
+		if err := store.RecordStatus(ctx, "service", "svc-a", "Service A", status, string(status)); err != nil {
+			t.Fatalf("record svc-a %s: %v", status, err)
+		}
+	}
+	for _, status := range []Status{StatusOK, StatusDown} {
+		if err := store.RecordStatus(ctx, "node", "node-a", "Node A", status, string(status)); err != nil {
+			t.Fatalf("record node-a %s: %v", status, err)
+		}
+	}
+
+	subjects, err := store.StatusVolatility(ctx, time.Now().Add(-time.Hour), 10)
+	if err != nil {
+		t.Fatalf("status volatility: %v", err)
+	}
+	if len(subjects) != 2 {
+		t.Fatalf("status volatility rows = %#v, want service and node", subjects)
+	}
+	if subjects[0].Kind != "service" || subjects[0].SubjectID != "svc-a" || subjects[0].ChangeCount != 3 || subjects[0].LatestFrom != StatusOK || subjects[0].LatestTo != StatusDegraded {
+		t.Fatalf("top volatility row = %#v, want svc-a with three changes and ok->degraded latest", subjects[0])
+	}
+	if subjects[1].Kind != "node" || subjects[1].SubjectID != "node-a" || subjects[1].ChangeCount != 1 {
+		t.Fatalf("second volatility row = %#v, want node-a with one change", subjects[1])
+	}
+
+	empty, err := store.StatusVolatility(ctx, time.Now().Add(time.Hour), 10)
+	if err != nil {
+		t.Fatalf("future status volatility: %v", err)
+	}
+	if len(empty) != 0 {
+		t.Fatalf("future volatility = %#v, want empty", empty)
 	}
 }
 

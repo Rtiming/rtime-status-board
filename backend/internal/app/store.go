@@ -149,6 +149,8 @@ func (s *Store) init() error {
 			detail TEXT NOT NULL DEFAULT '',
 			created_at TEXT NOT NULL
 		)`,
+		`CREATE INDEX IF NOT EXISTS idx_events_created ON events(created_at)`,
+		`CREATE INDEX IF NOT EXISTS idx_events_subject_created ON events(kind, subject_id, created_at)`,
 		`CREATE TABLE IF NOT EXISTS metrics_latest (
 			node_id TEXT PRIMARY KEY,
 			hostname TEXT NOT NULL DEFAULT '',
@@ -946,4 +948,54 @@ func (s *Store) RecentEvents(ctx context.Context, limit int) ([]Event, error) {
 		events = append(events, event)
 	}
 	return events, rows.Err()
+}
+
+func (s *Store) StatusVolatility(ctx context.Context, since time.Time, limit int) ([]StatusVolatilitySubject, error) {
+	if limit <= 0 || limit > 100 {
+		limit = 20
+	}
+	rows, err := s.db.QueryContext(ctx, `WITH counts AS (
+			SELECT kind, subject_id, COUNT(*) AS change_count
+			FROM events
+			WHERE created_at >= ?
+			GROUP BY kind, subject_id
+		)
+		SELECT
+			latest.kind,
+			latest.subject_id,
+			latest.label,
+			counts.change_count,
+			COALESCE(latest.from_status, ''),
+			latest.to_status,
+			latest.detail,
+			latest.created_at
+		FROM counts
+		JOIN events latest ON latest.id = (
+			SELECT id FROM events
+			WHERE kind = counts.kind AND subject_id = counts.subject_id AND created_at >= ?
+			ORDER BY created_at DESC, id DESC LIMIT 1
+		)
+		ORDER BY counts.change_count DESC, latest.created_at DESC, latest.kind ASC, latest.subject_id ASC
+		LIMIT ?`, since.Format(time.RFC3339Nano), since.Format(time.RFC3339Nano), limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	subjects := []StatusVolatilitySubject{}
+	for rows.Next() {
+		var subject StatusVolatilitySubject
+		var from, to, latest string
+		if err := rows.Scan(&subject.Kind, &subject.SubjectID, &subject.Label, &subject.ChangeCount, &from, &to, &subject.LatestDetail, &latest); err != nil {
+			return nil, err
+		}
+		subject.LatestFrom = Status(from)
+		subject.LatestTo = Status(to)
+		subject.LatestAt, err = time.Parse(time.RFC3339Nano, latest)
+		if err != nil {
+			return nil, fmt.Errorf("parse volatility event time: %w", err)
+		}
+		subjects = append(subjects, subject)
+	}
+	return subjects, rows.Err()
 }

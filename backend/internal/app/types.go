@@ -557,6 +557,7 @@ type OpsDiagnostic struct {
 	Issues             []OpsIssue                   `json:"issues"`
 	Counts             OpsIssueCounts               `json:"counts"`
 	ProjectImpacts     []OpsProjectImpact           `json:"project_impacts"`
+	StatusVolatility   StatusVolatilityDiagnostic   `json:"status_volatility"`
 	ResourceThresholds []EffectiveResourceThreshold `json:"resource_thresholds"`
 	ResourceStates     []OpsResourceState           `json:"resource_states"`
 }
@@ -596,6 +597,25 @@ type OpsProjectImpact struct {
 	AffectedServices []string `json:"affected_services,omitempty"`
 	IssueKinds       []string `json:"issue_kinds,omitempty"`
 	Detail           string   `json:"detail"`
+}
+
+type StatusVolatilityDiagnostic struct {
+	WindowSeconds   float64                   `json:"window_seconds"`
+	ChangeThreshold int                       `json:"change_threshold"`
+	Subjects        []StatusVolatilitySubject `json:"subjects"`
+}
+
+type StatusVolatilitySubject struct {
+	Kind         string    `json:"kind"`
+	SubjectID    string    `json:"subject_id"`
+	Label        string    `json:"label"`
+	ChangeCount  int       `json:"change_count"`
+	Status       Status    `json:"status"`
+	LatestFrom   Status    `json:"latest_from,omitempty"`
+	LatestTo     Status    `json:"latest_to"`
+	LatestDetail string    `json:"latest_detail"`
+	LatestAt     time.Time `json:"latest_at"`
+	Detail       string    `json:"detail"`
 }
 
 type EffectiveResourceThreshold struct {

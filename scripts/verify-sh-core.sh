@@ -402,6 +402,18 @@ for impact in ops_diag.get("project_impacts") or []:
     for key in ("project_id", "project_name", "status", "issue_count", "error_count", "warn_count", "info_count", "detail"):
         if key not in impact:
             raise SystemExit(f"ops project impact missing {key}: {impact}")
+volatility = ops_diag.get("status_volatility") or {}
+for key in ("window_seconds", "change_threshold", "subjects"):
+    if key not in volatility:
+        raise SystemExit(f"ops status volatility missing {key}: {volatility}")
+if volatility.get("window_seconds", 0) <= 0:
+    raise SystemExit(f"ops status volatility has invalid window: {volatility}")
+if volatility.get("change_threshold", 0) < 1:
+    raise SystemExit(f"ops status volatility has invalid threshold: {volatility}")
+for subject in volatility.get("subjects") or []:
+    for key in ("kind", "subject_id", "label", "change_count", "status", "latest_to", "latest_at", "detail"):
+        if key not in subject:
+            raise SystemExit(f"ops status volatility subject missing {key}: {subject}")
 
 if schema.get("version") != 2:
     raise SystemExit(f"telemetry schema version = {schema.get('version')}, want 2")
@@ -450,6 +462,7 @@ print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_na
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
 print(f"  API requests observed: {request_diag.get('total')} routes={len(request_diag.get('routes') or [])}")
 print(f"  build: {build_diag.get('commit')} {build_diag.get('built_at')}")
+print(f"  status volatility rows: {len(volatility.get('subjects') or [])} threshold={volatility.get('change_threshold')}")
 
 failures = diagnostics.get("failures") or []
 if failures:
