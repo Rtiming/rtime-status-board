@@ -160,7 +160,80 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 	requests := s.requestStats.Snapshot()
 	diagnostics.Runtime.Requests = requests
 	diagnostics.Ops = opsWithAPIRequestIssues(diagnostics.Ops, requests, time.Now().UTC())
+	diagnostics.Ops = opsWithRuntimeTimingIssues(diagnostics.Ops, diagnostics.Runtime.Diagnostics, time.Now().UTC())
 	s.writeJSON(w, http.StatusOK, diagnostics)
+}
+
+func opsWithRuntimeTimingIssues(ops OpsDiagnostic, timing RuntimeTimingDiagnostic, now time.Time) OpsDiagnostic {
+	totalWarnMS := timing.TotalWarnMS
+	if totalWarnMS <= 0 {
+		totalWarnMS = diagnosticsTotalWarnMS
+	}
+	stageWarnMS := timing.StageWarnMS
+	if stageWarnMS <= 0 {
+		stageWarnMS = diagnosticsStageWarnMS
+	}
+	timing.TotalWarnMS = totalWarnMS
+	timing.StageWarnMS = stageWarnMS
+
+	slowStages := []RuntimeStageDiagnostic{}
+	maxStageMS := int64(0)
+	for _, stage := range timing.Stages {
+		if stage.DurationMS > maxStageMS {
+			maxStageMS = stage.DurationMS
+		}
+		if stage.DurationMS >= stageWarnMS {
+			slowStages = append(slowStages, stage)
+		}
+	}
+	if timing.TotalMS < totalWarnMS && len(slowStages) == 0 {
+		return ops
+	}
+
+	value := float64(timing.TotalMS)
+	limit := float64(totalWarnMS)
+	metric := "total_latency"
+	if timing.TotalMS < totalWarnMS {
+		value = float64(maxStageMS)
+		limit = float64(stageWarnMS)
+		metric = "stage_latency"
+	}
+
+	ops.Issues = append(ops.Issues, OpsIssue{
+		Severity:   "warn",
+		Kind:       "runtime-diagnostics",
+		SubjectID:  "diagnostics-slow",
+		Status:     StatusDegraded,
+		Metric:     metric,
+		Value:      value,
+		Limit:      limit,
+		Unit:       "ms",
+		Detail:     runtimeTimingIssueDetail(timing, slowStages),
+		ObservedAt: now,
+	})
+	sortOpsIssues(ops.Issues)
+	ops.Counts = countOpsIssues(ops.Issues)
+	return ops
+}
+
+func runtimeTimingIssueDetail(timing RuntimeTimingDiagnostic, slowStages []RuntimeStageDiagnostic) string {
+	if len(slowStages) == 0 {
+		return fmt.Sprintf("Diagnostics request took %dms, above the %dms budget", timing.TotalMS, timing.TotalWarnMS)
+	}
+	sort.Slice(slowStages, func(i, j int) bool {
+		if slowStages[i].DurationMS == slowStages[j].DurationMS {
+			return slowStages[i].Name < slowStages[j].Name
+		}
+		return slowStages[i].DurationMS > slowStages[j].DurationMS
+	})
+	if len(slowStages) > 3 {
+		slowStages = slowStages[:3]
+	}
+	parts := make([]string, 0, len(slowStages))
+	for _, stage := range slowStages {
+		parts = append(parts, fmt.Sprintf("%s %dms", stage.Name, stage.DurationMS))
+	}
+	return fmt.Sprintf("Diagnostics request took %dms; slow stages: %s", timing.TotalMS, strings.Join(parts, ", "))
 }
 
 func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, now time.Time) OpsDiagnostic {
@@ -218,17 +291,21 @@ func opsWithAPIRequestIssues(ops OpsDiagnostic, requests APIRequestDiagnostic, n
 		})
 	}
 
-	sort.Slice(ops.Issues, func(i, j int) bool {
-		if severityRank(ops.Issues[i].Severity) == severityRank(ops.Issues[j].Severity) {
-			if ops.Issues[i].Kind == ops.Issues[j].Kind {
-				return ops.Issues[i].SubjectID < ops.Issues[j].SubjectID
-			}
-			return ops.Issues[i].Kind < ops.Issues[j].Kind
-		}
-		return severityRank(ops.Issues[i].Severity) < severityRank(ops.Issues[j].Severity)
-	})
+	sortOpsIssues(ops.Issues)
 	ops.Counts = countOpsIssues(ops.Issues)
 	return ops
+}
+
+func sortOpsIssues(issues []OpsIssue) {
+	sort.Slice(issues, func(i, j int) bool {
+		if severityRank(issues[i].Severity) == severityRank(issues[j].Severity) {
+			if issues[i].Kind == issues[j].Kind {
+				return issues[i].SubjectID < issues[j].SubjectID
+			}
+			return issues[i].Kind < issues[j].Kind
+		}
+		return severityRank(issues[i].Severity) < severityRank(issues[j].Severity)
+	})
 }
 
 func isPromotableSlowAPIRequest(sample APIRequestSample, thresholdMS float64) bool {

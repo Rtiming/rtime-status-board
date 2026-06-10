@@ -339,6 +339,8 @@ export interface RuntimeBuildDiagnostic {
 
 export interface RuntimeTimingDiagnostic {
   total_ms: number;
+  total_warn_ms: number;
+  stage_warn_ms: number;
   stages: RuntimeStageDiagnostic[];
 }
 

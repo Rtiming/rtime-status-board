@@ -153,8 +153,10 @@ SQLite database size/row-count/retention data, Diagnostics request stage
 timings, and bounded in-memory API request diagnostics. `runtime.diagnostics`
 includes total duration plus fixed stage rows for Gatus, SQLite reads, status
 volatility, Ops rollup, deployment checks, project diagnostics, and agent health
-rollup. These timings are measured inside the current request and do not write
-history. `runtime.requests` includes total
+rollup. The response also exposes `total_warn_ms` and `stage_warn_ms`; crossing
+those budgets promotes a `runtime-diagnostics` warning into `diagnostics.ops`.
+These timings are measured inside the current request and do not write history.
+`runtime.requests` includes total
 requests since process start, status-class counts, slow-request count,
 recent-sample P95/max latency, latest samples, and normalized route totals such
 as `GET /api/v1/nodes/:id/metrics`. It deliberately stores normalized route

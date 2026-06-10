@@ -452,6 +452,8 @@ export function Diagnostics({
             <strong>{runtime.build?.built_at ? formatTime(runtime.build.built_at) : '-'}</strong>
             <span>{t.diagnosticsTotal}</span>
             <strong>{formatLatencyMS(runtime.diagnostics?.total_ms ?? 0)}</strong>
+            <span>{t.diagnosticsBudget}</span>
+            <strong>{`${formatLatencyMS(runtime.diagnostics?.total_warn_ms ?? 0)} / ${formatLatencyMS(runtime.diagnostics?.stage_warn_ms ?? 0)}`}</strong>
             <span>{t.heap}</span>
             <strong>{formatBytes(runtime.memory.heap_alloc_bytes)}</strong>
             <span>{t.processMemory}</span>

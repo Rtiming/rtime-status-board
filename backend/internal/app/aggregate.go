@@ -38,6 +38,8 @@ const (
 	statusVolatilityWindow          = 24 * time.Hour
 	statusVolatilityThreshold       = 3
 	statusVolatilityLimit           = 20
+	diagnosticsTotalWarnMS          = 1500
+	diagnosticsStageWarnMS          = 1000
 )
 
 func NewAggregator(config *AppConfig, store *Store, gatus *GatusClient, ttl time.Duration) *Aggregator {
@@ -432,7 +434,11 @@ func summarizeCheckHistory[T any](results []T, success func(T) bool, timestamp f
 func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, error) {
 	diagnosticsStarted := time.Now()
 	generatedAt := diagnosticsStarted.UTC()
-	timing := RuntimeTimingDiagnostic{Stages: []RuntimeStageDiagnostic{}}
+	timing := RuntimeTimingDiagnostic{
+		TotalWarnMS: diagnosticsTotalWarnMS,
+		StageWarnMS: diagnosticsStageWarnMS,
+		Stages:      []RuntimeStageDiagnostic{},
+	}
 	recordStage := func(name string, started time.Time, status Status, detail string) {
 		timing.Stages = append(timing.Stages, RuntimeStageDiagnostic{
 			Name:       name,

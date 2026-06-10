@@ -384,6 +384,8 @@ if expected_build_time and expected_build_time != "unknown" and build_diag.get("
 runtime_timing = runtime_diag.get("diagnostics") or {}
 if runtime_timing.get("total_ms", -1) < 0:
     raise SystemExit(f"runtime diagnostics timing has invalid total: {runtime_timing}")
+if runtime_timing.get("total_warn_ms", 0) < 1 or runtime_timing.get("stage_warn_ms", 0) < 1:
+    raise SystemExit(f"runtime diagnostics timing has invalid budgets: {runtime_timing}")
 timing_stages = runtime_timing.get("stages") or []
 stage_names = {stage.get("name") for stage in timing_stages}
 for name in ("gatus-endpoints", "sqlite-latest-metrics", "sqlite-agent-reports", "sqlite-recent-events", "sqlite-status-volatility", "sqlite-store-diagnostics", "ops-rollup", "deployment-checks", "project-diagnostics", "agent-health-rollup"):
@@ -410,6 +412,9 @@ if "GET /api/v1/health" not in route_keys:
 runtime_api_issues = [issue for issue in ((diagnostics.get("ops") or {}).get("issues") or []) if issue.get("kind") == "runtime-api"]
 if runtime_api_issues:
     raise SystemExit(f"runtime API request issues in healthy verification path: {runtime_api_issues}")
+runtime_diagnostics_issues = [issue for issue in ((diagnostics.get("ops") or {}).get("issues") or []) if issue.get("kind") == "runtime-diagnostics"]
+if runtime_diagnostics_issues:
+    raise SystemExit(f"runtime diagnostics timing issues in healthy verification path: {runtime_diagnostics_issues}")
 ops_diag = diagnostics.get("ops") or {}
 if "project_impacts" not in ops_diag:
     raise SystemExit(f"ops diagnostics missing project_impacts: {ops_diag}")
@@ -477,7 +482,7 @@ print(f"  cached heavy collector rows: {cache_hits}/{len(metrics) * len(heavy_na
 print(f"  recent agent reports: {len(diagnostics.get('agent_reports') or [])}")
 print(f"  API requests observed: {request_diag.get('total')} routes={len(request_diag.get('routes') or [])}")
 print(f"  build: {build_diag.get('commit')} {build_diag.get('built_at')}")
-print(f"  diagnostics timing: total={runtime_timing.get('total_ms')}ms stages={len(timing_stages)}")
+print(f"  diagnostics timing: total={runtime_timing.get('total_ms')}ms total_budget={runtime_timing.get('total_warn_ms')}ms stage_budget={runtime_timing.get('stage_warn_ms')}ms stages={len(timing_stages)}")
 print(f"  status volatility rows: {len(volatility.get('subjects') or [])} threshold={volatility.get('change_threshold')}")
 
 failures = diagnostics.get("failures") or []

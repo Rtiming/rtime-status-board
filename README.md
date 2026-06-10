@@ -327,9 +327,10 @@ without adding another collector or polling loop.
 uptime, Go runtime memory, build commit/time, summary cache state, and SQLite
 size/row-count health. It also reports Diagnostics request stage timings for
 Gatus, SQLite reads, Ops rollups, deployment probes, and project/agent rollups,
-so slow debug requests can be isolated without opening container logs. These
-values are read on demand from the current process, environment, and database;
-they do not add a background collector.
+so slow debug requests can be isolated without opening container logs. A total
+Diagnostics request over `1500ms` or any single stage over `1000ms` is promoted
+as an Ops warning. These values are read on demand from the current process,
+environment, and database; they do not add a background collector.
 `/api/v1/diagnostics.deployment` exposes deployment-boundary checks for the
 status board itself: runtime mode, localhost bind address, Gatus URL, config
 path, SQLite data path, frontend artifact path, cache TTL, retention, and store

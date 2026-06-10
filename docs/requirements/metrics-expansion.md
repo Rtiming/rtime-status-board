@@ -132,7 +132,9 @@ Current implementation status:
 - Runtime diagnostics now includes per-request Diagnostics stage timings for
   Gatus, SQLite reads, status volatility, Ops rollup, deployment probes, project
   diagnostics, and agent health rollup. This exposes slow debug paths without
-  adding a poller, log store, or background profiler.
+  adding a poller, log store, or background profiler. Slow Diagnostics requests
+  are promoted into Ops when total time exceeds `1500ms` or one stage exceeds
+  `1000ms`.
 - The ops digest now promotes recent API 5xx responses and slow API samples
   into `runtime-api` issues, so backend interface failures are visible beside
   service, collector, config, and resource problems without opening container

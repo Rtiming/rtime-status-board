@@ -392,8 +392,10 @@ type RuntimeBuildDiagnostic struct {
 }
 
 type RuntimeTimingDiagnostic struct {
-	TotalMS int64                    `json:"total_ms"`
-	Stages  []RuntimeStageDiagnostic `json:"stages"`
+	TotalMS     int64                    `json:"total_ms"`
+	TotalWarnMS int64                    `json:"total_warn_ms"`
+	StageWarnMS int64                    `json:"stage_warn_ms"`
+	Stages      []RuntimeStageDiagnostic `json:"stages"`
 }
 
 type RuntimeStageDiagnostic struct {

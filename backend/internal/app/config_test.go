@@ -1537,6 +1537,63 @@ func TestAPIRequestIssuesIgnoreSlowDiagnosticsRoute(t *testing.T) {
 	}
 }
 
+func TestRuntimeTimingIssuesAreAddedToOpsDigest(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 30, 0, 0, time.UTC)
+	ops := opsWithRuntimeTimingIssues(OpsDiagnostic{}, RuntimeTimingDiagnostic{
+		TotalMS:     1250,
+		TotalWarnMS: 1000,
+		StageWarnMS: 750,
+		Stages: []RuntimeStageDiagnostic{
+			{Name: "gatus-endpoints", Status: StatusOK, DurationMS: 30, Detail: "ok"},
+			{Name: "deployment-checks", Status: StatusOK, DurationMS: 900, Detail: "ok"},
+		},
+	}, now)
+	if ops.Counts.Warn != 1 || len(ops.Issues) != 1 {
+		t.Fatalf("ops = %#v, want one runtime diagnostics warning", ops)
+	}
+	issue := ops.Issues[0]
+	if issue.Kind != "runtime-diagnostics" || issue.SubjectID != "diagnostics-slow" || issue.Value != 1250 || issue.Limit != 1000 {
+		t.Fatalf("issue = %#v, want diagnostics total latency warning", issue)
+	}
+	if !strings.Contains(issue.Detail, "deployment-checks 900ms") {
+		t.Fatalf("detail = %q, want slow stage summary", issue.Detail)
+	}
+}
+
+func TestRuntimeTimingIssuesWarnOnSlowStageOnly(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 31, 0, 0, time.UTC)
+	ops := opsWithRuntimeTimingIssues(OpsDiagnostic{}, RuntimeTimingDiagnostic{
+		TotalMS:     800,
+		TotalWarnMS: 1000,
+		StageWarnMS: 750,
+		Stages: []RuntimeStageDiagnostic{
+			{Name: "deployment-checks", Status: StatusOK, DurationMS: 780, Detail: "ok"},
+		},
+	}, now)
+	if ops.Counts.Warn != 1 || len(ops.Issues) != 1 {
+		t.Fatalf("ops = %#v, want one runtime diagnostics warning", ops)
+	}
+	issue := ops.Issues[0]
+	if issue.Metric != "stage_latency" || issue.Value != 780 || issue.Limit != 750 {
+		t.Fatalf("issue = %#v, want stage latency warning", issue)
+	}
+}
+
+func TestRuntimeTimingIssuesIgnoreHealthyTiming(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 32, 0, 0, time.UTC)
+	ops := opsWithRuntimeTimingIssues(OpsDiagnostic{}, RuntimeTimingDiagnostic{
+		TotalMS:     300,
+		TotalWarnMS: 1000,
+		StageWarnMS: 750,
+		Stages: []RuntimeStageDiagnostic{
+			{Name: "deployment-checks", Status: StatusOK, DurationMS: 260, Detail: "ok"},
+		},
+	}, now)
+	if len(ops.Issues) != 0 || ops.Counts != (OpsIssueCounts{}) {
+		t.Fatalf("ops = %#v, want no runtime timing issues", ops)
+	}
+}
+
 func TestSummarizeAPIRequestIssueRoutesRanksAndBoundsRoutes(t *testing.T) {
 	samples := []APIRequestSample{
 		{Method: http.MethodGet, Route: "/api/v1/summary", Status: http.StatusInternalServerError},
@@ -1648,6 +1705,9 @@ func TestDiagnosticsIncludesRuntimeStoreAndCache(t *testing.T) {
 	}
 	if diag.Runtime.Diagnostics.TotalMS < 0 || len(diag.Runtime.Diagnostics.Stages) == 0 {
 		t.Fatalf("runtime diagnostics timing = %#v, want total and stages", diag.Runtime.Diagnostics)
+	}
+	if diag.Runtime.Diagnostics.TotalWarnMS != diagnosticsTotalWarnMS || diag.Runtime.Diagnostics.StageWarnMS != diagnosticsStageWarnMS {
+		t.Fatalf("runtime diagnostics timing budgets = %#v, want defaults", diag.Runtime.Diagnostics)
 	}
 	stageNames := map[string]bool{}
 	for _, stage := range diag.Runtime.Diagnostics.Stages {
