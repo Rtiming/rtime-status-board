@@ -408,6 +408,7 @@ type RuntimeStageDiagnostic struct {
 	Name       string `json:"name"`
 	Status     Status `json:"status"`
 	DurationMS int64  `json:"duration_ms"`
+	WarnMS     int64  `json:"warn_ms,omitempty"`
 	Detail     string `json:"detail,omitempty"`
 }
 
@@ -429,10 +430,13 @@ type RuntimeSettings struct {
 }
 
 type DeploymentDiagnostic struct {
-	Status Status            `json:"status"`
-	Mode   string            `json:"mode"`
-	Detail string            `json:"detail"`
-	Checks []DeploymentCheck `json:"checks"`
+	Status          Status            `json:"status"`
+	Mode            string            `json:"mode"`
+	Detail          string            `json:"detail"`
+	CheckedAt       time.Time         `json:"checked_at"`
+	Cached          bool              `json:"cached"`
+	CacheTTLSeconds float64           `json:"cache_ttl_seconds"`
+	Checks          []DeploymentCheck `json:"checks"`
 }
 
 type DeploymentCheck struct {

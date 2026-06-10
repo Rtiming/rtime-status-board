@@ -177,28 +177,37 @@ func opsWithRuntimeTimingIssues(ops OpsDiagnostic, timing RuntimeTimingDiagnosti
 	timing.StageWarnMS = stageWarnMS
 
 	slowStages := []RuntimeStageDiagnostic{}
-	maxStageMS := int64(0)
+	effectiveTotalWarnMS := totalWarnMS
 	for _, stage := range timing.Stages {
-		if stage.DurationMS > maxStageMS {
-			maxStageMS = stage.DurationMS
+		stageBudget := runtimeStageWarnMS(stage, stageWarnMS)
+		if stageBudget > effectiveTotalWarnMS {
+			effectiveTotalWarnMS = stageBudget
 		}
-		if stage.DurationMS >= stageWarnMS {
+		if stage.DurationMS >= stageBudget {
 			slowStages = append(slowStages, stage)
 		}
 	}
-	if timing.TotalMS < totalWarnMS && len(slowStages) == 0 {
+	if timing.TotalMS < effectiveTotalWarnMS && len(slowStages) == 0 {
 		return ops
 	}
 
 	value := float64(timing.TotalMS)
-	limit := float64(totalWarnMS)
+	limit := float64(effectiveTotalWarnMS)
 	metric := "total_latency"
-	if timing.TotalMS < totalWarnMS {
-		value = float64(maxStageMS)
-		limit = float64(stageWarnMS)
+	if timing.TotalMS < effectiveTotalWarnMS && len(slowStages) > 0 {
+		slowestStage := slowStages[0]
+		for _, stage := range slowStages[1:] {
+			if stage.DurationMS > slowestStage.DurationMS {
+				slowestStage = stage
+			}
+		}
+		value = float64(slowestStage.DurationMS)
+		limit = float64(runtimeStageWarnMS(slowestStage, stageWarnMS))
 		metric = "stage_latency"
 	}
 
+	issueTiming := timing
+	issueTiming.TotalWarnMS = effectiveTotalWarnMS
 	ops.Issues = append(ops.Issues, OpsIssue{
 		Severity:   "warn",
 		Kind:       "runtime-diagnostics",
@@ -208,12 +217,19 @@ func opsWithRuntimeTimingIssues(ops OpsDiagnostic, timing RuntimeTimingDiagnosti
 		Value:      value,
 		Limit:      limit,
 		Unit:       "ms",
-		Detail:     runtimeTimingIssueDetail(timing, slowStages),
+		Detail:     runtimeTimingIssueDetail(issueTiming, slowStages),
 		ObservedAt: now,
 	})
 	sortOpsIssues(ops.Issues)
 	ops.Counts = countOpsIssues(ops.Issues)
 	return ops
+}
+
+func runtimeStageWarnMS(stage RuntimeStageDiagnostic, defaultWarnMS int64) int64 {
+	if stage.WarnMS > 0 {
+		return stage.WarnMS
+	}
+	return defaultWarnMS
 }
 
 func runtimeTimingIssueDetail(timing RuntimeTimingDiagnostic, slowStages []RuntimeStageDiagnostic) string {
@@ -231,7 +247,7 @@ func runtimeTimingIssueDetail(timing RuntimeTimingDiagnostic, slowStages []Runti
 	}
 	parts := make([]string, 0, len(slowStages))
 	for _, stage := range slowStages {
-		parts = append(parts, fmt.Sprintf("%s %dms", stage.Name, stage.DurationMS))
+		parts = append(parts, fmt.Sprintf("%s %dms/%dms", stage.Name, stage.DurationMS, runtimeStageWarnMS(stage, timing.StageWarnMS)))
 	}
 	return fmt.Sprintf("Diagnostics request took %dms; slow stages: %s", timing.TotalMS, strings.Join(parts, ", "))
 }

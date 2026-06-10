@@ -107,6 +107,12 @@ export function Diagnostics({
             <strong>{deployment.mode || '-'}</strong>
             <span>{t.detail}</span>
             <strong>{deployment.detail || '-'}</strong>
+            <span>{t.updated}</span>
+            <strong>{formatTime(deployment.checked_at)}</strong>
+            <span>{t.cached}</span>
+            <strong>{deployment.cached ? t.cached : '-'}</strong>
+            <span>{t.cacheTTL}</span>
+            <strong>{formatSeconds(deployment.cache_ttl_seconds)}</strong>
           </div>
           <h3 className="panel-subtitle">{t.deploymentChecks}</h3>
           <div className="inline-table deployment-table">
@@ -531,6 +537,7 @@ export function Diagnostics({
                       <th>{t.stage}</th>
                       <th>{t.status}</th>
                       <th>{t.duration}</th>
+                      <th>{t.stageBudget}</th>
                       <th>{t.detail}</th>
                     </tr>
                   </thead>
@@ -540,6 +547,7 @@ export function Diagnostics({
                         <td><strong>{stage.name}</strong></td>
                         <td><StatusPill status={stage.status} lang={lang} /></td>
                         <td>{formatLatencyMS(stage.duration_ms)}</td>
+                        <td>{stage.warn_ms ? formatLatencyMS(stage.warn_ms) : formatLatencyMS(runtime.diagnostics?.stage_warn_ms ?? 0)}</td>
                         <td>{stage.detail || '-'}</td>
                       </tr>
                     ))}

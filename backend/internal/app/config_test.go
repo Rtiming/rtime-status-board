@@ -323,6 +323,21 @@ func TestEndpointHealthCheck(t *testing.T) {
 	if failed.Status != StatusDegraded || failed.Detail != "entry health request failed from the statusd runtime" {
 		t.Fatalf("failed check = %#v, want request failure", failed)
 	}
+
+	attempts := 0
+	recovered := endpointHealthCheck("public-https-auth", "network", "https://status.example.com", http.StatusUnauthorized, "ok", deploymentHTTPDoerFunc(func(*http.Request) (*http.Response, error) {
+		attempts++
+		if attempts == 1 {
+			return nil, context.DeadlineExceeded
+		}
+		return &http.Response{
+			StatusCode: http.StatusUnauthorized,
+			Body:       io.NopCloser(strings.NewReader("unauthorized")),
+		}, nil
+	}))
+	if recovered.Status != StatusOK || recovered.Actual != "HTTP 401 after 2 attempts" || !strings.Contains(recovered.Detail, "first attempt was context deadline exceeded") {
+		t.Fatalf("recovered check = %#v, want retry recovery detail", recovered)
+	}
 }
 
 type deploymentHTTPDoerFunc func(*http.Request) (*http.Response, error)
@@ -1704,6 +1719,21 @@ func TestRuntimeTimingIssuesWarnOnSlowStageOnly(t *testing.T) {
 	}
 }
 
+func TestRuntimeTimingIssuesUseStageSpecificBudget(t *testing.T) {
+	now := time.Date(2026, 6, 10, 12, 31, 30, 0, time.UTC)
+	ops := opsWithRuntimeTimingIssues(OpsDiagnostic{}, RuntimeTimingDiagnostic{
+		TotalMS:     1100,
+		TotalWarnMS: 1000,
+		StageWarnMS: 750,
+		Stages: []RuntimeStageDiagnostic{
+			{Name: "deployment-checks", Status: StatusOK, DurationMS: 1050, WarnMS: 2500, Detail: "ok"},
+		},
+	}, now)
+	if len(ops.Issues) != 0 || ops.Counts != (OpsIssueCounts{}) {
+		t.Fatalf("ops = %#v, want no runtime timing issues for stage-specific budget", ops)
+	}
+}
+
 func TestRuntimeTimingIssuesIgnoreHealthyTiming(t *testing.T) {
 	now := time.Date(2026, 6, 10, 12, 32, 0, 0, time.UTC)
 	ops := opsWithRuntimeTimingIssues(OpsDiagnostic{}, RuntimeTimingDiagnostic{
@@ -1835,8 +1865,10 @@ func TestDiagnosticsIncludesRuntimeStoreAndCache(t *testing.T) {
 		t.Fatalf("runtime diagnostics timing budgets = %#v, want defaults", diag.Runtime.Diagnostics)
 	}
 	stageNames := map[string]bool{}
+	stageWarns := map[string]int64{}
 	for _, stage := range diag.Runtime.Diagnostics.Stages {
 		stageNames[stage.Name] = true
+		stageWarns[stage.Name] = stage.WarnMS
 		if stage.DurationMS < 0 || stage.Status == "" {
 			t.Fatalf("runtime diagnostics stage = %#v, want status and non-negative duration", stage)
 		}
@@ -1846,11 +1878,45 @@ func TestDiagnosticsIncludesRuntimeStoreAndCache(t *testing.T) {
 			t.Fatalf("runtime diagnostics stages = %#v, missing %s", diag.Runtime.Diagnostics.Stages, want)
 		}
 	}
+	if stageWarns["deployment-checks"] != deploymentDiagnosticsWarnMS {
+		t.Fatalf("deployment stage warn = %d, want %d", stageWarns["deployment-checks"], deploymentDiagnosticsWarnMS)
+	}
 	if !diag.Runtime.SummaryCache.Cached || diag.Runtime.SummaryCache.TTLSeconds != 10 || diag.Runtime.SummaryCache.SecondsUntilExpiry <= 0 {
 		t.Fatalf("summary cache = %#v, want warm cache with 10s ttl", diag.Runtime.SummaryCache)
 	}
 	if diag.Runtime.Store.MetricsLatestRows != 1 || diag.Runtime.Store.MetricsSampleRows != 1 || diag.Runtime.Store.MetricsReportLogRows != 1 {
 		t.Fatalf("store diagnostics = %#v, want metrics rows", diag.Runtime.Store)
+	}
+}
+
+func TestDeploymentDiagnosticCache(t *testing.T) {
+	frontendDir := t.TempDir()
+	writeFile(t, filepath.Join(frontendDir, "index.html"), "<!doctype html>")
+	aggregator := NewAggregatorWithRuntime(&AppConfig{App: AppMeta{Name: "test"}}, nil, nil, 10*time.Second, RuntimeSettings{
+		DeploymentMode:   "development",
+		ConfigPath:       "../../../config/status-board.yaml",
+		DBPath:           "./data/status-board.dev.db",
+		GatusURL:         "http://gatus:8080/",
+		ListenAddr:       ":8080",
+		FrontendDir:      frontendDir,
+		CacheTTL:         10 * time.Second,
+		MetricsRetention: 30 * 24 * time.Hour,
+	})
+
+	first := aggregator.deploymentDiagnosticCached(StoreDiagnostic{TotalSizeBytes: 2 << 20}, time.Date(2026, 6, 10, 13, 0, 0, 0, time.UTC))
+	second := aggregator.deploymentDiagnosticCached(StoreDiagnostic{TotalSizeBytes: 999 << 20}, time.Date(2026, 6, 10, 13, 0, 1, 0, time.UTC))
+
+	if first.Cached {
+		t.Fatalf("first deployment diagnostic cached = true, want false")
+	}
+	if !second.Cached {
+		t.Fatalf("second deployment diagnostic cached = false, want true")
+	}
+	if first.CacheTTLSeconds != deploymentDiagnosticCacheTTL.Seconds() || second.CacheTTLSeconds != deploymentDiagnosticCacheTTL.Seconds() {
+		t.Fatalf("cache TTLs = %v / %v, want %v", first.CacheTTLSeconds, second.CacheTTLSeconds, deploymentDiagnosticCacheTTL.Seconds())
+	}
+	if !first.CheckedAt.Equal(second.CheckedAt) {
+		t.Fatalf("cached checked_at = %s, want first checked_at %s", second.CheckedAt, first.CheckedAt)
 	}
 }
 

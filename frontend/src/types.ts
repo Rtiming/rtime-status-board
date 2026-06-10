@@ -354,6 +354,7 @@ export interface RuntimeStageDiagnostic {
   name: string;
   status: Status;
   duration_ms: number;
+  warn_ms?: number;
   detail?: string;
 }
 
@@ -440,6 +441,9 @@ export interface DeploymentDiagnostic {
   status: Status;
   mode: string;
   detail: string;
+  checked_at: string;
+  cached: boolean;
+  cache_ttl_seconds: number;
   checks: DeploymentCheck[];
 }
 

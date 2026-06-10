@@ -28,6 +28,10 @@ type Aggregator struct {
 	mu        sync.Mutex
 	expiresAt time.Time
 	cached    *SummaryResponse
+
+	deploymentMu        sync.Mutex
+	deploymentExpiresAt time.Time
+	deploymentCached    *DeploymentDiagnostic
 }
 
 const (
@@ -40,6 +44,8 @@ const (
 	statusVolatilityLimit           = 20
 	diagnosticsTotalWarnMS          = 1500
 	diagnosticsStageWarnMS          = 1000
+	deploymentDiagnosticsWarnMS     = 2500
+	deploymentDiagnosticCacheTTL    = 30 * time.Second
 	agentReportLagWarnSeconds       = 30
 )
 
@@ -440,11 +446,16 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 		StageWarnMS: diagnosticsStageWarnMS,
 		Stages:      []RuntimeStageDiagnostic{},
 	}
-	recordStage := func(name string, started time.Time, status Status, detail string) {
+	recordStage := func(name string, started time.Time, status Status, detail string, warnMS ...int64) {
+		var stageWarnMS int64
+		if len(warnMS) > 0 {
+			stageWarnMS = warnMS[0]
+		}
 		timing.Stages = append(timing.Stages, RuntimeStageDiagnostic{
 			Name:       name,
 			Status:     status,
 			DurationMS: time.Since(started).Milliseconds(),
+			WarnMS:     stageWarnMS,
 			Detail:     detail,
 		})
 	}
@@ -501,8 +512,8 @@ func (a *Aggregator) Diagnostics(ctx context.Context) (*DiagnosticsResponse, err
 	ops := a.opsDiagnostic(generatedAt, services, metrics, metricsDiagnostic, issues, statusVolatility)
 	recordStage("ops-rollup", opsStart, StatusOK, fmt.Sprintf("%d ops issues", len(ops.Issues)))
 	deploymentStart := time.Now()
-	deployment := a.deploymentDiagnostic(storeDiagnostic)
-	recordStage("deployment-checks", deploymentStart, deployment.Status, fmt.Sprintf("%d deployment checks", len(deployment.Checks)))
+	deployment := a.deploymentDiagnosticCached(storeDiagnostic, generatedAt)
+	recordStage("deployment-checks", deploymentStart, deployment.Status, fmt.Sprintf("%d deployment checks", len(deployment.Checks)), deploymentDiagnosticsWarnMS)
 	projectDiagnosticsStart := time.Now()
 	projectDiagnostics := a.projectDiagnostics(projects, services, metricsDiagnostic, endpoints, recentEvents, ops.ProjectImpacts)
 	recordStage("project-diagnostics", projectDiagnosticsStart, StatusOK, fmt.Sprintf("%d project rows", len(projectDiagnostics)))
@@ -1601,6 +1612,34 @@ func (a *Aggregator) runtimeDiagnostic(now time.Time, store StoreDiagnostic, dia
 	}
 }
 
+func (a *Aggregator) deploymentDiagnosticCached(store StoreDiagnostic, now time.Time) DeploymentDiagnostic {
+	cacheTTL := deploymentDiagnosticCacheTTL
+	a.deploymentMu.Lock()
+	if a.deploymentCached != nil && time.Now().Before(a.deploymentExpiresAt) {
+		cached := *a.deploymentCached
+		cached.Cached = true
+		cached.CacheTTLSeconds = cacheTTL.Seconds()
+		a.deploymentMu.Unlock()
+		return cached
+	}
+	a.deploymentMu.Unlock()
+
+	diag := a.deploymentDiagnostic(store)
+	if diag.CheckedAt.IsZero() {
+		diag.CheckedAt = now
+	}
+	diag.CacheTTLSeconds = cacheTTL.Seconds()
+
+	a.deploymentMu.Lock()
+	cached := diag
+	cached.Cached = false
+	a.deploymentCached = &cached
+	a.deploymentExpiresAt = time.Now().Add(cacheTTL)
+	a.deploymentMu.Unlock()
+
+	return diag
+}
+
 func (a *Aggregator) deploymentDiagnostic(store StoreDiagnostic) DeploymentDiagnostic {
 	settings := a.runtime
 	mode := strings.TrimSpace(settings.DeploymentMode)
@@ -1711,10 +1750,12 @@ func (a *Aggregator) deploymentDiagnostic(store StoreDiagnostic) DeploymentDiagn
 		detail = fmt.Sprintf("%d deployment boundary checks need attention", failing)
 	}
 	return DeploymentDiagnostic{
-		Status: status,
-		Mode:   mode,
-		Detail: detail,
-		Checks: checks,
+		Status:          status,
+		Mode:            mode,
+		Detail:          detail,
+		CheckedAt:       time.Now().UTC(),
+		CacheTTLSeconds: deploymentDiagnosticCacheTTL.Seconds(),
+		Checks:          checks,
 	}
 }
 
@@ -1765,26 +1806,53 @@ func endpointHealthCheck(key string, category string, baseURL string, expectedSt
 		check.Detail = "entry URL must use HTTP or HTTPS"
 		return check
 	}
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, healthURL, nil)
-	if err != nil {
-		check.Status = StatusDegraded
-		check.Actual = err.Error()
-		check.Detail = "entry health request could not be built"
-		return check
-	}
-	resp, err := doer.Do(req)
-	if err != nil {
-		check.Status = StatusDegraded
-		check.Actual = err.Error()
-		check.Detail = "entry health request failed from the statusd runtime"
-		return check
-	}
-	defer resp.Body.Close()
-	_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1024))
-	check.Actual = fmt.Sprintf("HTTP %d", resp.StatusCode)
-	if resp.StatusCode != expectedStatus {
+
+	const maxAttempts = 2
+	firstAttempt := ""
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, healthURL, nil)
+		if err != nil {
+			check.Status = StatusDegraded
+			check.Actual = err.Error()
+			check.Detail = "entry health request could not be built"
+			return check
+		}
+		resp, err := doer.Do(req)
+		if err != nil {
+			check.Actual = err.Error()
+			if firstAttempt == "" {
+				firstAttempt = err.Error()
+			}
+			if attempt < maxAttempts {
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+			check.Status = StatusDegraded
+			check.Detail = "entry health request failed from the statusd runtime"
+			return check
+		}
+		if resp.Body != nil {
+			_, _ = io.Copy(io.Discard, io.LimitReader(resp.Body, 1024))
+			_ = resp.Body.Close()
+		}
+		check.Actual = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		if resp.StatusCode == expectedStatus {
+			if attempt > 1 {
+				check.Actual = fmt.Sprintf("HTTP %d after %d attempts", resp.StatusCode, attempt)
+				check.Detail = fmt.Sprintf("%s; first attempt was %s", okDetail, nonEmpty(firstAttempt, "transient HTTP failure"))
+			}
+			return check
+		}
+		if firstAttempt == "" {
+			firstAttempt = fmt.Sprintf("HTTP %d", resp.StatusCode)
+		}
+		if resp.StatusCode >= 500 && attempt < maxAttempts {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
 		check.Status = StatusDegraded
 		check.Detail = fmt.Sprintf("entry health returned HTTP %d, want %d", resp.StatusCode, expectedStatus)
+		return check
 	}
 	return check
 }

@@ -360,6 +360,11 @@ def env_value(key):
 deployment_diag = diagnostics.get("deployment") or {}
 if deployment_diag.get("status") != "ok":
     raise SystemExit(f"deployment diagnostics not ok: {deployment_diag}")
+for key in ("checked_at", "cached", "cache_ttl_seconds"):
+    if key not in deployment_diag:
+        raise SystemExit(f"deployment diagnostics missing {key}: {deployment_diag}")
+if deployment_diag.get("cache_ttl_seconds", 0) <= 0:
+    raise SystemExit(f"deployment diagnostics cache TTL is invalid: {deployment_diag}")
 deployment_checks = {row.get("key"): row for row in deployment_diag.get("checks") or []}
 for key in ("tailnet-health", "public-http-auth", "public-https-auth", "public-domain-dns"):
     row = deployment_checks.get(key)
@@ -397,6 +402,9 @@ for stage in timing_stages:
             raise SystemExit(f"runtime diagnostics timing stage missing {key}: {stage}")
     if stage.get("duration_ms", -1) < 0:
         raise SystemExit(f"runtime diagnostics timing stage has invalid duration: {stage}")
+deployment_stage = next((stage for stage in timing_stages if stage.get("name") == "deployment-checks"), {})
+if deployment_stage.get("warn_ms", 0) < runtime_timing.get("stage_warn_ms", 0):
+    raise SystemExit(f"deployment diagnostics stage does not expose an elevated warn budget: {deployment_stage}")
 
 request_diag = runtime_diag.get("requests") or {}
 if request_diag.get("total", 0) < 1:

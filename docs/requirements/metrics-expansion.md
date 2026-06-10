@@ -141,7 +141,10 @@ Current implementation status:
   diagnostics, and agent health rollup. This exposes slow debug paths without
   adding a poller, log store, or background profiler. Slow Diagnostics requests
   are promoted into Ops when total time exceeds `1500ms` or one stage exceeds
-  `1000ms`.
+  `1000ms`; stages may expose a local `warn_ms` when their expected latency
+  envelope is different. Deployment probes use this for external entry checks,
+  so normal public-route variance is tracked but does not create noisy runtime
+  warnings.
 - The ops digest now promotes recent API 5xx responses and slow API samples
   into `runtime-api` issues, so backend interface failures are visible beside
   service, collector, config, and resource problems without opening container
@@ -157,7 +160,9 @@ Current implementation status:
   DNS-to-public-IP match. It also performs short health probes for Tailnet,
   public HTTP, and public HTTPS entries, expecting public entries to return
   unauthenticated `401`. These checks are on-demand local reads plus bounded
-  DNS/HTTP(S) requests only, and avoid Docker socket or shell access from the app.
+  DNS/HTTP(S) requests only, avoid Docker socket or shell access from the app,
+  and are cached briefly with one short retry for transient request/5xx failures
+  to keep the Diagnostics tab low-load and less noisy.
 - Diagnostics now includes a project coverage matrix so each project can be
   checked for service count, critical/down/degraded services, Gatus endpoint
   coverage, related nodes, latest metrics-agent coverage, recent check/failure

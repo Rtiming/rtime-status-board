@@ -160,7 +160,10 @@ includes total duration plus fixed stage rows for Gatus, SQLite reads, status
 volatility, Ops rollup, deployment checks, project diagnostics, and agent health
 rollup. The response also exposes `total_warn_ms` and `stage_warn_ms`; crossing
 those budgets promotes a `runtime-diagnostics` warning into `diagnostics.ops`.
-These timings are measured inside the current request and do not write history.
+Individual stage rows may expose `warn_ms` when a stage has a different
+expected envelope; deployment live checks use that to tolerate normal external
+entry variance without hiding genuinely slow internal stages. These timings are
+measured inside the current request and do not write history.
 `runtime.requests` includes total
 requests since process start, status-class counts, slow-request count,
 recent-sample P95/max latency, latest samples, and normalized route totals such
@@ -187,12 +190,16 @@ HTTP/HTTPS probes expect unauthenticated `401` so Basic Auth regressions and
 certificate/SNI errors are visible directly in the Diagnostics tab. The
 in-process diagnostics use runtime settings, local file stat calls, one bounded
 DNS lookup, short HTTP(S) health probes, and existing SQLite diagnostics only;
-they do not run Docker commands, read Docker sockets, or start a collector. The external
-`make verify-sh-core` acceptance script adds host-level checks that should not
-run inside the app process, including Docker container resource budgets, Nginx
-Basic Auth route checks, production directory hygiene, full node/project/service
-detail API smoke, bounded metrics-history smoke for `1h`, `24h`, and `7d`
-node/project windows, and bounded check-log smoke for node, project, and service
+they do not run Docker commands, read Docker sockets, or start a collector. The
+deployment diagnostic includes `checked_at`, `cached`, and `cache_ttl_seconds`;
+successful and failed boundary snapshots are cached briefly to keep the
+debugging surface low-load, while transient request errors and HTTP 5xx results
+get one short retry before being reported. The external `make verify-sh-core`
+acceptance script adds host-level checks that should not run inside the app
+process, including Docker container resource budgets, Nginx Basic Auth route
+checks, production directory hygiene, full node/project/service detail API
+smoke, bounded metrics-history smoke for `1h`, `24h`, and `7d` node/project
+windows, and bounded check-log smoke for node, project, and service
 drill-down paths. The metrics-history and check-log smokes also verify the
 returned `summary` objects for each sampled path. It also verifies that
 `runtime.requests` records prior API traffic, status classes, latency summary,

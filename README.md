@@ -329,8 +329,11 @@ size/row-count health. It also reports Diagnostics request stage timings for
 Gatus, SQLite reads, Ops rollups, deployment probes, and project/agent rollups,
 so slow debug requests can be isolated without opening container logs. A total
 Diagnostics request over `1500ms` or any single stage over `1000ms` is promoted
-as an Ops warning. These values are read on demand from the current process,
-environment, and database; they do not add a background collector.
+as an Ops warning unless the stage exposes a stricter local budget; deployment
+live probes use their own stage budget to avoid classifying normal public-entry
+network variance as a runtime fault. These values are read on demand from the
+current process, environment, and database; they do not add a background
+collector.
 `/api/v1/diagnostics.deployment` exposes deployment-boundary checks for the
 status board itself: runtime mode, localhost bind address, Gatus URL, config
 path, SQLite data path, frontend artifact path, cache TTL, retention, and store
@@ -340,9 +343,11 @@ DNS/proxy mistakes are visible from the Diagnostics tab without
 confusing them with the Basic Auth protected public-IP route. Production
 diagnostics also probe Tailnet, public HTTP, and public HTTPS health endpoints
 with short timeouts; public entries are expected to return unauthenticated
-`401`. It only inspects already-loaded settings, local files, bounded DNS/
-HTTP(S) checks, and existing SQLite diagnostics; it does not open a Docker
-socket, run shell commands, or add another process.
+`401`. These deployment checks are cached for 30 seconds inside the process, and
+transient request failures or HTTP 5xx responses get one short retry. It only
+inspects already-loaded settings, local files, bounded DNS/HTTP(S) checks, and
+existing SQLite diagnostics; it does not open a Docker socket, run shell
+commands, or add another process.
 `/api/v1/diagnostics.projects` returns a project coverage matrix assembled from
 existing service config, Gatus endpoint mappings, and latest metrics-agent
 freshness. It shows service counts, critical/down/degraded counts, mapped versus
