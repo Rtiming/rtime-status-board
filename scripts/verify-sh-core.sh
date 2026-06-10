@@ -10,6 +10,7 @@ MAX_GATUS_MEM_MIB="${MAX_GATUS_MEM_MIB:-96}"
 MAX_COMBINED_MEM_MIB="${MAX_COMBINED_MEM_MIB:-150}"
 MAX_COMBINED_CPU_PERCENT="${MAX_COMBINED_CPU_PERCENT:-50}"
 MAX_REMOTE_TREE_MIB="${MAX_REMOTE_TREE_MIB:-128}"
+RECENT_LOG_WINDOW="${RECENT_LOG_WINDOW:-10m}"
 RTIME_SSH="$HOME/.ai-skills/rtime-remote/scripts/rtime-ssh"
 RTIME_DOCTOR="$HOME/.ai-skills/rtime-remote/scripts/rtime-doctor"
 
@@ -35,6 +36,7 @@ TAILNET_STATUS_URL="${TAILNET_STATUS_URL:-http://100.64.10.5:18083}"
 echo "[INFO] Verifying $REMOTE_NODE:$REMOTE_DIR"
 echo "[INFO] Resource budget: statusd<=${MAX_STATUSD_MEM_MIB}MiB gatus<=${MAX_GATUS_MEM_MIB}MiB combined<=${MAX_COMBINED_MEM_MIB}MiB cpu<=${MAX_COMBINED_CPU_PERCENT}%"
 echo "[INFO] Remote tree budget: <=${MAX_REMOTE_TREE_MIB}MiB under $REMOTE_DIR"
+echo "[INFO] Recent log window: $RECENT_LOG_WINDOW"
 echo "[INFO] Public entry target: $STATUS_DOMAIN -> $PUBLIC_IP"
 
 remote_script="$(cat <<'REMOTE'
@@ -429,6 +431,19 @@ for service in service_samples:
     print(f"  service {service_id}: {checks.get('returned', 0)} latest check rows")
 PY
 
+echo "[REMOTE] recent container log hygiene"
+for container in rtime-status-board-statusd rtime-status-board-gatus; do
+  log_file="/tmp/${container}.recent.log"
+  docker logs --since "$RECENT_LOG_WINDOW" --tail 300 "$container" >"$log_file" 2>&1
+  if grep -Eiq '(panic|fatal|traceback|level=error|level":"error)' "$log_file"; then
+    echo "[ERROR] recent $container logs contain fatal/error signatures" >&2
+    grep -Ein '(panic|fatal|traceback|level=error|level":"error)' "$log_file" | tail -20 >&2
+    exit 1
+  fi
+  line_count="$(wc -l <"$log_file" | tr -d ' ')"
+  echo "  $container: ${line_count:-0} recent log lines, no fatal/error signatures"
+done
+
 echo "[REMOTE] status-board verification ok"
 REMOTE
 )"
@@ -442,6 +457,7 @@ remote_cmd+=" MAX_GATUS_MEM_MIB=$(printf "%q" "$MAX_GATUS_MEM_MIB")"
 remote_cmd+=" MAX_COMBINED_MEM_MIB=$(printf "%q" "$MAX_COMBINED_MEM_MIB")"
 remote_cmd+=" MAX_COMBINED_CPU_PERCENT=$(printf "%q" "$MAX_COMBINED_CPU_PERCENT")"
 remote_cmd+=" MAX_REMOTE_TREE_MIB=$(printf "%q" "$MAX_REMOTE_TREE_MIB")"
+remote_cmd+=" RECENT_LOG_WINDOW=$(printf "%q" "$RECENT_LOG_WINDOW")"
 remote_cmd+=" bash -lc $(printf "%q" "$remote_script")"
 
 "$RTIME_SSH" "$REMOTE_NODE" "$remote_cmd"

@@ -120,6 +120,11 @@ Current implementation status:
 - Diagnostics now includes status-board runtime and SQLite store statistics
   so deployment resource growth can be checked without opening shell logs or
   adding another process.
+- Backend API request logs now include method, path, status code, response
+  bytes, and duration without recording bodies, query strings, or auth headers.
+  Production verification also scans recent status-board container logs for
+  fatal/error signatures, improving operations debugging without adding a
+  collector or log store.
 - Diagnostics now includes deployment-boundary checks for the board runtime
   itself: production mode, reserved localhost ports, Gatus URL, config/data/
   frontend paths, frontend artifact readability, cache TTL, retention, SQLite

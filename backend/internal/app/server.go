@@ -27,6 +27,29 @@ type Server struct {
 	options ServerOptions
 }
 
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	status int
+	bytes  int
+}
+
+func (w *loggingResponseWriter) WriteHeader(status int) {
+	if w.status != 0 {
+		return
+	}
+	w.status = status
+	w.ResponseWriter.WriteHeader(status)
+}
+
+func (w *loggingResponseWriter) Write(data []byte) (int, error) {
+	if w.status == 0 {
+		w.status = http.StatusOK
+	}
+	n, err := w.ResponseWriter.Write(data)
+	w.bytes += n
+	return n, err
+}
+
 func NewServer(options ServerOptions) *Server {
 	if options.Logger == nil {
 		options.Logger = slog.Default()
@@ -510,10 +533,33 @@ func (s *Server) writeError(w http.ResponseWriter, status int, err error) {
 
 func (s *Server) withLogging(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := time.Now()
-		next.ServeHTTP(w, r)
-		if strings.HasPrefix(r.URL.Path, "/api/") {
-			s.options.Logger.Info("request", "method", r.Method, "path", r.URL.Path, "duration", time.Since(start).String())
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
+			next.ServeHTTP(w, r)
+			return
 		}
+		start := time.Now()
+		recorder := &loggingResponseWriter{ResponseWriter: w}
+		next.ServeHTTP(recorder, r)
+		status := recorder.status
+		if status == 0 {
+			status = http.StatusOK
+		}
+		duration := time.Since(start)
+		level := slog.LevelInfo
+		if status >= 500 {
+			level = slog.LevelError
+		} else if status >= 400 {
+			level = slog.LevelWarn
+		}
+		s.options.Logger.Log(
+			r.Context(),
+			level,
+			"request",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", status,
+			"bytes", recorder.bytes,
+			"duration_ms", float64(duration.Microseconds())/1000,
+		)
 	})
 }

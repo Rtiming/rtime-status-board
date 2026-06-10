@@ -1,9 +1,11 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -1270,6 +1272,33 @@ func TestMetricsReportsEndpointReturnsBoundedLogs(t *testing.T) {
 	}
 	if response.NodeID != "sh-core" || response.Returned != 1 || len(response.Logs) != 1 {
 		t.Fatalf("response = %#v, want one sh-core log", response)
+	}
+}
+
+func TestRequestLoggingIncludesStatusAndBytes(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	server := NewServer(ServerOptions{Logger: logger})
+
+	okRecorder := httptest.NewRecorder()
+	server.Router().ServeHTTP(okRecorder, httptest.NewRequest(http.MethodGet, "/api/v1/health", nil))
+	if okRecorder.Code != http.StatusOK {
+		t.Fatalf("health status = %d, want 200", okRecorder.Code)
+	}
+	okLog := logs.String()
+	if !strings.Contains(okLog, "status=200") || !strings.Contains(okLog, "bytes=") || !strings.Contains(okLog, "duration_ms=") {
+		t.Fatalf("health log = %q, want status, bytes, and duration_ms", okLog)
+	}
+
+	logs.Reset()
+	notFoundRecorder := httptest.NewRecorder()
+	server.Router().ServeHTTP(notFoundRecorder, httptest.NewRequest(http.MethodGet, "/api/v1/not-found", nil))
+	if notFoundRecorder.Code != http.StatusNotFound {
+		t.Fatalf("not-found status = %d, want 404", notFoundRecorder.Code)
+	}
+	notFoundLog := logs.String()
+	if !strings.Contains(notFoundLog, "level=WARN") || !strings.Contains(notFoundLog, "status=404") || !strings.Contains(notFoundLog, "path=/api/v1/not-found") {
+		t.Fatalf("not-found log = %q, want WARN status 404 path", notFoundLog)
 	}
 }
 

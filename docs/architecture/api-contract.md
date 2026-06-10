@@ -21,6 +21,12 @@ error notice includes that detail instead of showing only the HTTP status code.
 This keeps node/project/service drill-down failures actionable without opening
 browser DevTools or server logs first.
 
+The backend access log records method, path, status code, response bytes, and
+duration in milliseconds for API requests. It deliberately avoids request
+bodies, query strings, and authorization headers so production logs stay useful
+without becoming another secret surface. 4xx requests log at warn level and 5xx
+requests log at error level.
+
 ## Future Detail APIs
 
 Implemented detail APIs:
@@ -158,7 +164,9 @@ run inside the app process, including Docker container resource budgets, Nginx
 Basic Auth route checks, production directory hygiene, full node/project/service
 detail API smoke, and bounded check-log smoke for node, project, and service
 drill-down paths. The bounded check-log smoke also verifies the returned
-`summary` object for each sampled path.
+`summary` object for each sampled path. The verifier also scans recent
+status-board container logs for fatal/error signatures such as panic, traceback,
+fatal, or structured error-level entries.
 
 `/api/v1/diagnostics.projects` exposes a low-load project coverage matrix. Each
 row includes project ID/name/status/detail, service and critical-service counts,
