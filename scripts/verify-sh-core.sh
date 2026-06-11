@@ -241,22 +241,30 @@ fi
 echo "  Tailnet nginx health: 200"
 
 if [[ ! -f "$PUBLIC_AUTH_FILE" ]]; then
-  echo "[ERROR] public Basic Auth file is missing: $PUBLIC_AUTH_FILE" >&2
+  echo "[ERROR] public htpasswd file is missing: $PUBLIC_AUTH_FILE" >&2
   exit 1
 fi
-nginx_user="$(awk '$1 == "user" { gsub(";", "", $2); print $2; exit }' /etc/nginx/nginx.conf 2>/dev/null || true)"
-if [[ -n "$nginx_user" ]] && command -v runuser >/dev/null 2>&1; then
-  if ! runuser -u "$nginx_user" -- test -r "$PUBLIC_AUTH_FILE"; then
-    echo "[ERROR] public Basic Auth file is not readable by nginx user $nginx_user: $PUBLIC_AUTH_FILE" >&2
-    exit 1
-  fi
-else
-  if [[ ! -r "$PUBLIC_AUTH_FILE" ]]; then
-    echo "[ERROR] public Basic Auth file is not readable: $PUBLIC_AUTH_FILE" >&2
-    exit 1
-  fi
+if [[ ! -r "$PUBLIC_AUTH_FILE" ]]; then
+  echo "[ERROR] public htpasswd file is not readable by root: $PUBLIC_AUTH_FILE" >&2
+  exit 1
 fi
-echo "  public Basic Auth file readable"
+echo "  public htpasswd file readable"
+
+auth_cookie_secret="$(awk -F= '$1 == "STATUS_BOARD_AUTH_COOKIE_SECRET" { sub(/^[^=]*=/, ""); gsub(/^"|"$/, ""); print; exit }' .env.production)"
+auth_htpasswd="$(awk -F= '$1 == "STATUS_BOARD_AUTH_HTPASSWD" { sub(/^[^=]*=/, ""); gsub(/^"|"$/, ""); print; exit }' .env.production)"
+if [[ -z "$auth_cookie_secret" || "$auth_cookie_secret" == "change-me-cookie-secret" ]]; then
+  echo "[ERROR] STATUS_BOARD_AUTH_COOKIE_SECRET is missing or still set to placeholder" >&2
+  exit 1
+fi
+if [[ -z "$auth_htpasswd" ]]; then
+  echo "[ERROR] STATUS_BOARD_AUTH_HTPASSWD is missing" >&2
+  exit 1
+fi
+if ! docker exec rtime-status-board-statusd sh -c "test -r '$auth_htpasswd'"; then
+  echo "[ERROR] statusd container cannot read auth htpasswd path: $auth_htpasswd" >&2
+  exit 1
+fi
+echo "  statusd cookie auth env and htpasswd mount ok"
 
 public_domain_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.public-domain.html -w "%{http_code}" -H "Host: $STATUS_DOMAIN" "http://127.0.0.1/api/v1/health" || true)"
 if [[ "$public_domain_status" != "401" ]]; then
@@ -273,6 +281,26 @@ if [[ "$public_https_status" != "401" ]]; then
   exit 1
 fi
 echo "  public HTTPS domain unauthenticated check: 401"
+
+public_https_root="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.public-root.html -w "%{http_code} %{redirect_url}" --resolve "$STATUS_DOMAIN:443:127.0.0.1" "https://$STATUS_DOMAIN/" || true)"
+if [[ "$public_https_root" != 302\ *"/login?next="* ]]; then
+  echo "[ERROR] public HTTPS root returned '$public_https_root', want 302 redirect to /login" >&2
+  cat /tmp/rtime-status-board.public-root.html >&2 || true
+  exit 1
+fi
+echo "  public HTTPS root redirects to login"
+
+login_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.login.html -w "%{http_code}" --resolve "$STATUS_DOMAIN:443:127.0.0.1" "https://$STATUS_DOMAIN/login" || true)"
+if [[ "$login_status" != "200" ]]; then
+  echo "[ERROR] public HTTPS login page returned HTTP $login_status, want 200" >&2
+  cat /tmp/rtime-status-board.login.html >&2 || true
+  exit 1
+fi
+if ! grep -q "验证这台设备" /tmp/rtime-status-board.login.html; then
+  echo "[ERROR] public HTTPS login page did not contain expected login UI marker" >&2
+  exit 1
+fi
+echo "  public HTTPS login page: 200"
 
 public_ip_path_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.public-ip.html -w "%{http_code}" -H "Host: $PUBLIC_IP" "http://127.0.0.1/status-board/api/v1/health" || true)"
 if [[ "$public_ip_path_status" != "401" ]]; then

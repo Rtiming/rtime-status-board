@@ -111,6 +111,44 @@ REMOTE
 "$RTIME_SSH" "$REMOTE_NODE" \
   "REMOTE_DIR=$(printf "%q" "$REMOTE_DIR") STATUS_BOARD_ENV_FILE=$(printf "%q" "$STATUS_BOARD_ENV_FILE") STATUS_BOARD_PUBLIC_DOMAIN=$(printf "%q" "$PUBLIC_DOMAIN") STATUS_BOARD_PUBLIC_IP=$(printf "%q" "$PUBLIC_IP") STATUS_BOARD_TAILNET_URL=$(printf "%q" "$TAILNET_STATUS_URL") STATUS_BOARD_BUILD_COMMIT=$(printf "%q" "$BUILD_COMMIT") STATUS_BOARD_BUILD_TIME=$(printf "%q" "$BUILD_TIME") bash -lc $(printf "%q" "$metadata_env_script")"
 
+auth_env_script="$(cat <<'REMOTE'
+set -euo pipefail
+cd "$REMOTE_DIR"
+env_file=".env.production"
+backup="$env_file.bak.auth.$(date +%Y%m%d-%H%M%S)"
+tmp="$(mktemp)"
+cp -p "$env_file" "$backup"
+
+current_secret="$(awk -F= '$1 == "STATUS_BOARD_AUTH_COOKIE_SECRET" { sub(/^[^=]*=/, ""); gsub(/^"|"$/, ""); print; exit }' "$env_file")"
+if [[ -z "$current_secret" || "$current_secret" == "change-me-cookie-secret" ]]; then
+  current_secret="$(openssl rand -base64 48)"
+fi
+
+awk -F= '
+  $1 == "STATUS_BOARD_AUTH_COOKIE_NAME" { next }
+  $1 == "STATUS_BOARD_AUTH_COOKIE_SECRET" { next }
+  $1 == "STATUS_BOARD_AUTH_HTPASSWD" { next }
+  $1 == "STATUS_BOARD_AUTH_SESSION_TTL" { next }
+  { print }
+' "$env_file" >"$tmp"
+
+{
+  printf "STATUS_BOARD_AUTH_COOKIE_NAME=rtime_status_session\n"
+  printf "STATUS_BOARD_AUTH_COOKIE_SECRET=%s\n" "$current_secret"
+  printf "STATUS_BOARD_AUTH_HTPASSWD=/run/rtime-status-board/.htpasswd\n"
+  printf "STATUS_BOARD_AUTH_SESSION_TTL=720h\n"
+} >>"$tmp"
+
+cat "$tmp" >"$env_file"
+chmod 600 "$env_file"
+rm -f "$tmp"
+printf "[OK] Ensured remote cookie auth env keys: STATUS_BOARD_AUTH_COOKIE_NAME STATUS_BOARD_AUTH_COOKIE_SECRET STATUS_BOARD_AUTH_HTPASSWD STATUS_BOARD_AUTH_SESSION_TTL\n"
+printf "[INFO] Remote env backup: %s/%s\n" "$REMOTE_DIR" "$backup"
+REMOTE
+)"
+"$RTIME_SSH" "$REMOTE_NODE" \
+  "REMOTE_DIR=$(printf "%q" "$REMOTE_DIR") bash -lc $(printf "%q" "$auth_env_script")"
+
 if ! "$RTIME_SSH" "$REMOTE_NODE" "docker compose version >/dev/null 2>&1"; then
   echo "[ERROR] docker compose plugin is missing on $REMOTE_NODE."
   echo "        Run: make install-compose-sh-core"

@@ -144,7 +144,7 @@ entry values from `.env.production` when present, otherwise falling back to the
 safe example values in this public repo. It verifies the remote
 production directory hygiene, remote tree size, Compose config, running
 containers, status-board container resource budget, expected listening ports,
-Tailnet Nginx health, public Nginx Basic Auth boundaries, health endpoint,
+Tailnet Nginx health, public cookie-auth boundaries, health endpoint,
 telemetry schema, metrics agent freshness, collector issues, recent agent
 reports, per-collector coverage, all node/project/service detail endpoints, and
 bounded node/project metric-history windows and node/project/service check-log
@@ -203,12 +203,14 @@ make install-status-https-sh-core
 
 The script uses acme.sh DNS-01 issuance, writes the public certificate under
 `/etc/nginx/ssl`, backs up `/etc/nginx/conf.d/rtime-status-board.conf`, runs
-`nginx -t`, reloads Nginx, and checks HTTPS returns `401` without credentials.
+`nginx -t`, reloads Nginx, checks public API requests return `401` without a
+cookie, and checks the HTTPS login page returns `200`.
 
-The public entries use Nginx Basic Auth. The htpasswd file lives on sh-core at
-`/etc/nginx/.htpasswd-rtime-status-board` and must not be committed.
-Unauthenticated public checks should return HTTP `401`; that is the expected
-safe state.
+The public entries use signed-cookie auth. The login form verifies credentials
+against the htpasswd file on sh-core at `/etc/nginx/.htpasswd-rtime-status-board`;
+the cookie signing secret lives only in the remote `.env.production` file and
+must not be committed. Unauthenticated public API checks should return HTTP
+`401`; browser page requests should redirect to `/login`.
 
 If your status domain resolves to `198.18.0.0/15` from the Mac, that is usually
 a local proxy fake-IP DNS answer, not your production host. Verify the
@@ -222,7 +224,7 @@ curl --noproxy '*' --resolve status.example.com:443:203.0.113.10 \
   -I https://status.example.com/api/v1/health
 ```
 
-Expect `401 Unauthorized` until credentials are supplied. If external DNS is
+Expect `401 Unauthorized` until a valid auth cookie is supplied. If external DNS is
 not configured yet, use the public IP path or Tailnet entry instead of the
 domain.
 
@@ -379,7 +381,7 @@ path, SQLite data path, frontend artifact path, cache TTL, retention, and store
 size budget. It also reports the configured Tailnet URL, public IP entry
 configuration, and public-domain DNS match against the configured public IP, so
 DNS/proxy mistakes are visible from the Diagnostics tab without
-confusing them with the Basic Auth protected public-IP route. Production
+confusing them with the protected public-IP route. Production
 diagnostics also probe Tailnet, public HTTP, and public HTTPS health endpoints
 with short timeouts; public entries are expected to return unauthenticated
 `401`. These deployment checks are cached for 30 seconds inside the process, and

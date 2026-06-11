@@ -22,6 +22,7 @@ type ServerOptions struct {
 	FrontendDir    string
 	HeartbeatToken string
 	AgentToken     string
+	Auth           AuthOptions
 	Logger         *slog.Logger
 }
 
@@ -62,6 +63,9 @@ func NewServer(options ServerOptions) *Server {
 
 func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
+	mux.HandleFunc("/_auth/check", s.authCheck)
+	mux.HandleFunc("/_auth/logout", s.authLogout)
+	mux.HandleFunc("/login", s.authLogin)
 	mux.HandleFunc("/api/v1/health", s.health)
 	mux.HandleFunc("/api/v1/summary", s.summary)
 	mux.HandleFunc("/api/v1/nodes", s.nodes)

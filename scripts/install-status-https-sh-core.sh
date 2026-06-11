@@ -90,7 +90,7 @@ if [[ ! -x "$ACME" ]]; then
   exit 1
 fi
 if [[ ! -f "$AUTH_FILE" ]]; then
-  echo "[ERROR] Basic Auth file is missing: $AUTH_FILE" >&2
+  echo "[ERROR] htpasswd auth file is missing: $AUTH_FILE" >&2
   exit 1
 fi
 if [[ ! -f "$CONF" ]]; then
@@ -169,14 +169,56 @@ server {{
     server_name {domain};
 
     server_tokens off;
-    auth_basic "RTime Status Board";
-    auth_basic_user_file /etc/nginx/.htpasswd-rtime-status-board;
     add_header X-Robots-Tag "noindex, nofollow" always;
 
     access_log /var/log/nginx/status.rtime.site.public.access.log;
     error_log /var/log/nginx/status.rtime.site.public.error.log;
 
+    location = /_auth/check {{
+        internal;
+        proxy_pass http://127.0.0.1:23180/_auth/check;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location = /login {{
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location = /_auth/logout {{
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
+    location @login_redirect {{
+        return 302 /login?next=$request_uri;
+    }}
+
+    location /api/ {{
+        auth_request /_auth/check;
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
     location / {{
+        auth_request /_auth/check;
+        error_page 401 = @login_redirect;
         proxy_pass http://127.0.0.1:23180;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -197,14 +239,56 @@ server {{
     ssl_session_cache shared:status_board_ssl:10m;
     ssl_session_timeout 1d;
 
-    auth_basic "RTime Status Board";
-    auth_basic_user_file /etc/nginx/.htpasswd-rtime-status-board;
     add_header X-Robots-Tag "noindex, nofollow" always;
 
     access_log /var/log/nginx/status.rtime.site.public-ssl.access.log;
     error_log /var/log/nginx/status.rtime.site.public-ssl.error.log;
 
+    location = /_auth/check {{
+        internal;
+        proxy_pass http://127.0.0.1:23180/_auth/check;
+        proxy_pass_request_body off;
+        proxy_set_header Content-Length "";
+        proxy_set_header Cookie $http_cookie;
+        proxy_set_header X-Original-URI $request_uri;
+        proxy_set_header X-Forwarded-Proto https;
+    }}
+
+    location = /login {{
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }}
+
+    location = /_auth/logout {{
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }}
+
+    location @login_redirect {{
+        return 302 /login?next=$request_uri;
+    }}
+
+    location /api/ {{
+        auth_request /_auth/check;
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }}
+
     location / {{
+        auth_request /_auth/check;
+        error_page 401 = @login_redirect;
         proxy_pass http://127.0.0.1:23180;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -236,6 +320,13 @@ fi
 echo "[REMOTE] nginx config backup: $backup"
 echo "[REMOTE] certificate: $FULLCHAIN"
 echo "[REMOTE] HTTPS unauthenticated check: 401"
+login_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.login.html -w "%{http_code}" --resolve "$DOMAIN:443:127.0.0.1" "https://$DOMAIN/login" || true)"
+if [[ "$login_status" != "200" ]]; then
+  echo "[ERROR] HTTPS login page returned HTTP $login_status, want 200" >&2
+  cat /tmp/rtime-status-board.login.html >&2 || true
+  exit 1
+fi
+echo "[REMOTE] HTTPS login page check: 200"
 REMOTE
 )"
 

@@ -1782,8 +1782,8 @@ func (a *Aggregator) deploymentDiagnostic(store StoreDiagnostic) DeploymentDiagn
 		if publicEntryReadyForLiveCheck(settings.PublicDomain, settings.PublicIP) {
 			client := &http.Client{Timeout: 1500 * time.Millisecond}
 			checks = append(checks, endpointHealthCheck("tailnet-health", "network", tailnetURL, http.StatusOK, "Tailnet/private Nginx entry returns health without public credentials", client))
-			checks = append(checks, endpointHealthCheck("public-http-auth", "network", publicEntryURL("http", settings.PublicDomain), http.StatusUnauthorized, "public HTTP entry is protected by Basic Auth", client))
-			checks = append(checks, endpointHealthCheck("public-https-auth", "network", publicEntryURL("https", settings.PublicDomain), http.StatusUnauthorized, "public HTTPS entry has a valid certificate and is protected by Basic Auth", client))
+			checks = append(checks, endpointHealthCheck("public-http-auth", "network", publicEntryURL("http", settings.PublicDomain), http.StatusUnauthorized, "public HTTP API entry is protected by cookie auth", client))
+			checks = append(checks, endpointHealthCheck("public-https-auth", "network", publicEntryURL("https", settings.PublicDomain), http.StatusUnauthorized, "public HTTPS API entry has a valid certificate and is protected by cookie auth", client))
 		} else {
 			add("public-http-auth", "network", StatusDegraded, "HTTP 401 from public domain", "", "public HTTP live check skipped because public domain or IP is not configured")
 			add("public-https-auth", "network", StatusDegraded, "HTTPS 401 from public domain", "", "public HTTPS live check skipped because public domain or IP is not configured")
@@ -1858,7 +1858,7 @@ func publicIPEntryCheck(publicIP string) DeploymentCheck {
 		Key:      "public-ip-entry",
 		Category: "network",
 		Status:   StatusOK,
-		Expected: "valid public IP with /status-board/ protected by Basic Auth",
+		Expected: "valid public IP with /status-board/ protected by auth",
 		Actual:   publicIP,
 		Detail:   "public IP entry is configured; verify-sh-core checks that unauthenticated access returns 401",
 	}

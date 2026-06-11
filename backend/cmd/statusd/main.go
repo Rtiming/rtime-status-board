@@ -83,7 +83,13 @@ func main() {
 		FrontendDir:    frontendDir,
 		HeartbeatToken: env("STATUS_BOARD_HEARTBEAT_TOKEN", ""),
 		AgentToken:     env("STATUS_BOARD_AGENT_TOKEN", ""),
-		Logger:         logger,
+		Auth: app.AuthOptions{
+			CookieName:   env("STATUS_BOARD_AUTH_COOKIE_NAME", ""),
+			CookieSecret: env("STATUS_BOARD_AUTH_COOKIE_SECRET", ""),
+			HtpasswdPath: env("STATUS_BOARD_AUTH_HTPASSWD", ""),
+			SessionTTL:   parseOptionalDuration(env("STATUS_BOARD_AUTH_SESSION_TTL", "")),
+		},
+		Logger: logger,
 	})
 
 	httpServer := &http.Server{
@@ -124,6 +130,18 @@ func env(key, fallback string) string {
 		return value
 	}
 	return fallback
+}
+
+func parseOptionalDuration(value string) time.Duration {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return 0
+	}
+	duration, err := parseDurationWithDays(value)
+	if err != nil {
+		return 0
+	}
+	return duration
 }
 
 func parseDurationWithDays(value string) (time.Duration, error) {

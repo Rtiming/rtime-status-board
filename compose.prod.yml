@@ -25,9 +25,14 @@ services:
       STATUS_BOARD_TAILNET_URL: ${STATUS_BOARD_TAILNET_URL:-http://100.64.10.5:18083}
       STATUS_BOARD_BUILD_COMMIT: ${STATUS_BOARD_BUILD_COMMIT:-unknown}
       STATUS_BOARD_BUILD_TIME: ${STATUS_BOARD_BUILD_TIME:-unknown}
+      STATUS_BOARD_AUTH_COOKIE_NAME: ${STATUS_BOARD_AUTH_COOKIE_NAME:-rtime_status_session}
+      STATUS_BOARD_AUTH_COOKIE_SECRET: ${STATUS_BOARD_AUTH_COOKIE_SECRET:-}
+      STATUS_BOARD_AUTH_HTPASSWD: ${STATUS_BOARD_AUTH_HTPASSWD:-/run/rtime-status-board/.htpasswd}
+      STATUS_BOARD_AUTH_SESSION_TTL: ${STATUS_BOARD_AUTH_SESSION_TTL:-720h}
     network_mode: host
     volumes:
       - status_data:/data
+      - /etc/nginx/.htpasswd-rtime-status-board:/run/rtime-status-board/.htpasswd:ro
     depends_on:
       - gatus
 
