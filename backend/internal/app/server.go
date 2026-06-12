@@ -65,6 +65,7 @@ func (s *Server) Router() http.Handler {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/_auth/check", s.authCheck)
 	mux.HandleFunc("/_auth/logout", s.authLogout)
+	mux.HandleFunc("/_auth/trust-device", s.authTrustDevice)
 	mux.HandleFunc("/login", s.authLogin)
 	mux.HandleFunc("/api/v1/health", s.health)
 	mux.HandleFunc("/api/v1/summary", s.summary)

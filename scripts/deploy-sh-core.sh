@@ -123,26 +123,43 @@ current_secret="$(awk -F= '$1 == "STATUS_BOARD_AUTH_COOKIE_SECRET" { sub(/^[^=]*
 if [[ -z "$current_secret" || "$current_secret" == "change-me-cookie-secret" ]]; then
   current_secret="$(openssl rand -base64 48)"
 fi
+current_domain="$(awk -F= '$1 == "STATUS_BOARD_AUTH_COOKIE_DOMAIN" { sub(/^[^=]*=/, ""); gsub(/^"|"$/, ""); print; exit }' "$env_file")"
+if [[ -z "$current_domain" ]]; then
+  current_domain=".rtime.site"
+fi
+current_device_hash="$(awk -F= '$1 == "STATUS_BOARD_AUTH_DEVICE_TOKEN_SHA256" { sub(/^[^=]*=/, ""); gsub(/^"|"$/, ""); print; exit }' "$env_file")"
+current_device_username="$(awk -F= '$1 == "STATUS_BOARD_AUTH_DEVICE_USERNAME" { sub(/^[^=]*=/, ""); gsub(/^"|"$/, ""); print; exit }' "$env_file")"
+if [[ -z "$current_device_username" ]]; then
+  current_device_username="rtime"
+fi
 
 awk -F= '
   $1 == "STATUS_BOARD_AUTH_COOKIE_NAME" { next }
   $1 == "STATUS_BOARD_AUTH_COOKIE_SECRET" { next }
+  $1 == "STATUS_BOARD_AUTH_COOKIE_DOMAIN" { next }
   $1 == "STATUS_BOARD_AUTH_HTPASSWD" { next }
   $1 == "STATUS_BOARD_AUTH_SESSION_TTL" { next }
+  $1 == "STATUS_BOARD_AUTH_DEVICE_TOKEN_SHA256" { next }
+  $1 == "STATUS_BOARD_AUTH_DEVICE_USERNAME" { next }
   { print }
 ' "$env_file" >"$tmp"
 
 {
   printf "STATUS_BOARD_AUTH_COOKIE_NAME=rtime_status_session\n"
   printf "STATUS_BOARD_AUTH_COOKIE_SECRET=%s\n" "$current_secret"
+  printf "STATUS_BOARD_AUTH_COOKIE_DOMAIN=%s\n" "$current_domain"
   printf "STATUS_BOARD_AUTH_HTPASSWD=/run/rtime-status-board/.htpasswd\n"
   printf "STATUS_BOARD_AUTH_SESSION_TTL=720h\n"
+  if [[ -n "$current_device_hash" ]]; then
+    printf "STATUS_BOARD_AUTH_DEVICE_TOKEN_SHA256=%s\n" "$current_device_hash"
+  fi
+  printf "STATUS_BOARD_AUTH_DEVICE_USERNAME=%s\n" "$current_device_username"
 } >>"$tmp"
 
 cat "$tmp" >"$env_file"
 chmod 600 "$env_file"
 rm -f "$tmp"
-printf "[OK] Ensured remote cookie auth env keys: STATUS_BOARD_AUTH_COOKIE_NAME STATUS_BOARD_AUTH_COOKIE_SECRET STATUS_BOARD_AUTH_HTPASSWD STATUS_BOARD_AUTH_SESSION_TTL\n"
+printf "[OK] Ensured remote cookie auth env keys: STATUS_BOARD_AUTH_COOKIE_NAME STATUS_BOARD_AUTH_COOKIE_SECRET STATUS_BOARD_AUTH_COOKIE_DOMAIN STATUS_BOARD_AUTH_HTPASSWD STATUS_BOARD_AUTH_SESSION_TTL STATUS_BOARD_AUTH_DEVICE_USERNAME\n"
 printf "[INFO] Remote env backup: %s/%s\n" "$REMOTE_DIR" "$backup"
 REMOTE
 )"

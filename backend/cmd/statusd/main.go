@@ -84,10 +84,13 @@ func main() {
 		HeartbeatToken: env("STATUS_BOARD_HEARTBEAT_TOKEN", ""),
 		AgentToken:     env("STATUS_BOARD_AGENT_TOKEN", ""),
 		Auth: app.AuthOptions{
-			CookieName:   env("STATUS_BOARD_AUTH_COOKIE_NAME", ""),
-			CookieSecret: env("STATUS_BOARD_AUTH_COOKIE_SECRET", ""),
-			HtpasswdPath: env("STATUS_BOARD_AUTH_HTPASSWD", ""),
-			SessionTTL:   parseOptionalDuration(env("STATUS_BOARD_AUTH_SESSION_TTL", "")),
+			CookieName:        env("STATUS_BOARD_AUTH_COOKIE_NAME", ""),
+			CookieSecret:      env("STATUS_BOARD_AUTH_COOKIE_SECRET", ""),
+			CookieDomain:      env("STATUS_BOARD_AUTH_COOKIE_DOMAIN", ""),
+			HtpasswdPath:      env("STATUS_BOARD_AUTH_HTPASSWD", ""),
+			SessionTTL:        parseOptionalDuration(env("STATUS_BOARD_AUTH_SESSION_TTL", "")),
+			DeviceTokenSHA256: env("STATUS_BOARD_AUTH_DEVICE_TOKEN_SHA256", ""),
+			DeviceUsername:    env("STATUS_BOARD_AUTH_DEVICE_USERNAME", ""),
 		},
 		Logger: logger,
 	})

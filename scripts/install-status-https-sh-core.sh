@@ -193,6 +193,15 @@ server {{
         proxy_set_header X-Forwarded-Proto $scheme;
     }}
 
+    location = /_auth/trust-device {{
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }}
+
     location = /_auth/logout {{
         proxy_pass http://127.0.0.1:23180;
         proxy_http_version 1.1;
@@ -255,6 +264,15 @@ server {{
     }}
 
     location = /login {{
+        proxy_pass http://127.0.0.1:23180;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+    }}
+
+    location = /_auth/trust-device {{
         proxy_pass http://127.0.0.1:23180;
         proxy_http_version 1.1;
         proxy_set_header Host $host;

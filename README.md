@@ -212,6 +212,15 @@ the cookie signing secret lives only in the remote `.env.production` file and
 must not be committed. Unauthenticated public API checks should return HTTP
 `401`; browser page requests should redirect to `/login`.
 
+For personal consoles under `*.rtime.site`, production can set
+`STATUS_BOARD_AUTH_COOKIE_DOMAIN=.rtime.site` so the status-board session cookie
+can be shared with other owner-only apps. The optional
+`/_auth/trust-device#token=...` flow is for bootstrapping a trusted browser when
+the password is unavailable: the token stays in the URL fragment, is POSTed by
+the page, and should be cleared from the remote env after the device has been
+trusted. Do not use this owner-only cookie for public user/account systems such
+as subscription delivery.
+
 If your status domain resolves to `198.18.0.0/15` from the Mac, that is usually
 a local proxy fake-IP DNS answer, not your production host. Verify the
 server-side public route without relying on local DNS by substituting your

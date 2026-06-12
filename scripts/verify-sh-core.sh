@@ -302,6 +302,18 @@ if ! grep -q "验证这台设备" /tmp/rtime-status-board.login.html; then
 fi
 echo "  public HTTPS login page: 200"
 
+trust_device_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.trust-device.html -w "%{http_code}" --resolve "$STATUS_DOMAIN:443:127.0.0.1" "https://$STATUS_DOMAIN/_auth/trust-device" || true)"
+if [[ "$trust_device_status" != "200" ]]; then
+  echo "[ERROR] public HTTPS trust-device page returned HTTP $trust_device_status, want 200" >&2
+  cat /tmp/rtime-status-board.trust-device.html >&2 || true
+  exit 1
+fi
+if ! grep -q "信任这台设备" /tmp/rtime-status-board.trust-device.html; then
+  echo "[ERROR] public HTTPS trust-device page did not contain expected trust UI marker" >&2
+  exit 1
+fi
+echo "  public HTTPS trust-device page: 200"
+
 public_ip_path_status="$(curl --noproxy "*" -sS -o /tmp/rtime-status-board.public-ip.html -w "%{http_code}" -H "Host: $PUBLIC_IP" "http://127.0.0.1/status-board/api/v1/health" || true)"
 if [[ "$public_ip_path_status" != "401" ]]; then
   echo "[ERROR] public IP /status-board entry without credentials returned HTTP $public_ip_path_status, want 401" >&2
